@@ -1,0 +1,45 @@
+// Local-only browser verification. Uses temporary authenticated sessions, never stored credentials.
+import { createRequire } from 'node:module';
+import { randomBytes,randomUUID } from 'node:crypto';
+import { mkdirSync } from 'node:fs';
+import { openDatabase } from '../server/db.mjs';
+import { digest,hashPassword } from '../server/auth.mjs';
+import { createApp } from '../server/index.mjs';
+const require=createRequire(import.meta.url);
+const { chromium }=require(process.env.PLAYWRIGHT_MODULE||'C:/Users/jerem/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_PATH||'C:/Program Files/Google/Chrome/Application/chrome.exe'});
+const db=openDatabase(':memory:');
+const nowFixture=new Date().toISOString(),uidFixture=randomUUID(),hashFixture=hashPassword(randomBytes(24).toString('hex'));
+db.prepare('INSERT INTO units(id,name,device_id,created_at,updated_at) VALUES(?,?,?,?,?)').run(uidFixture,'UBS Verificação','TEST-DEVICE',nowFixture,nowFixture);
+for(const role of ['admin','unit'])db.prepare('INSERT INTO users(id,username,password_hash,role,unit_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?)').run(randomUUID(),'Test'+role,hashFixture,role,role==='unit'?uidFixture:null,nowFixture,nowFixture);
+const {server}=createApp({db});await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+const tokens=[],context=await browser.newContext({viewport:{width:1440,height:1080}}),page=await context.newPage(),errors=[];
+page.on('pageerror',e=>errors.push(e.message));
+const origin='http://127.0.0.1:'+server.address().port;mkdirSync('output/qa',{recursive:true});
+const testName='UBS Verificação '+Date.now(),testLogin='UBSTeste'+Date.now();let evaluationId;
+function token(role){const user=db.prepare('SELECT id FROM users WHERE role=? LIMIT 1').get(role),token=randomBytes(32).toString('hex'),now=Date.now();tokens.push(digest(token));db.prepare('INSERT INTO sessions VALUES(?,?,?,?,?,?)').run(digest(token),user.id,randomBytes(24).toString('hex'),now,now,now+3600000);return token;}
+const wait=()=>page.locator('.loading-section').waitFor({state:'hidden'});
+try {
+  await page.goto(origin);await page.locator('.login-form').waitFor();await page.screenshot({path:'output/qa/login.png',fullPage:true});
+  await context.addCookies([{name:'vox_session',value:token('admin'),url:origin,httpOnly:true,sameSite:'Strict'}]);await page.reload();await wait();await page.getByRole('heading',{name:'Visão Geral',exact:true}).waitFor();await page.screenshot({path:'output/qa/dashboard-desktop.png',fullPage:true});
+  for(const [label,key]of [['Unidades de Saúde','units'],['Avaliações','evaluations'],['Comparativo de Unidades','comparison'],['Categorias','categories'],['Alertas e Anomalias','alerts'],['Histórico e Auditoria','audit'],['Relatórios','reports'],['Usuários e Acessos','users'],['Configurações','settings']]){await page.locator(`.nav-link[data-nav="${key}"]`).click();await wait();await page.getByRole('heading',{name:label,exact:true}).waitFor();if(await page.locator('main>.error').count())throw Error('Error on page '+label);}
+  await page.locator('.nav-link[data-nav="units"]').click();await wait();await page.locator('.unit-cell').first().click();await wait();await page.getByRole('heading',{name:'Evolução por categoria',exact:true}).waitFor();await page.getByLabel('Categoria do gráfico histórico').selectOption('5');await page.screenshot({path:'output/qa/unit-analysis.png',fullPage:true});
+  await page.getByRole('button',{name:'Todas as unidades',exact:true}).click();await wait();
+  await page.locator('.nav-link[data-nav="units"]').click();await wait();await page.getByRole('button',{name:'Nova unidade',exact:true}).click();await page.getByLabel('Nome da unidade').fill(testName);await page.getByLabel('Usuário da unidade').fill(testLogin);await page.getByLabel('Senha provisória',{exact:true}).fill('Temporary-'+randomBytes(12).toString('hex'));await page.getByRole('button',{name:'Cadastrar unidade',exact:true}).click();await page.locator('dialog').waitFor({state:'hidden'});await wait();await page.locator('.unit-cell').filter({hasText:testName}).waitFor();
+  const fixture=db.prepare('SELECT id FROM units WHERE name=?').get(testName);db.prepare('DELETE FROM users WHERE unit_id=?').run(fixture.id);db.prepare('DELETE FROM units WHERE id=?').run(fixture.id);
+  await page.locator('.nav-link[data-nav="reports"]').click();await wait();for(const format of ['csv','pdf']){const download=page.waitForEvent('download');await page.locator(`[data-action="export"][data-format="${format}"]`).click();const file=await download;await file.saveAs(`output/qa/report.${format}`);}
+  await page.locator('.nav-link[data-nav="overview"]').click();await wait();await page.setViewportSize({width:390,height:844});await page.screenshot({path:'output/qa/dashboard-mobile.png',fullPage:true,animations:'disabled'});if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Mobile page overflows');
+  await context.clearCookies();await context.addCookies([{name:'vox_session',value:token('unit'),url:origin,httpOnly:true,sameSite:'Strict'}]);await page.setViewportSize({width:1280,height:900});await page.reload();await page.getByRole('button',{name:'AVALIAR ATENDIMENTO'}).waitFor();await page.screenshot({path:'output/qa/kiosk-welcome.png',fullPage:true});
+  const count=db.prepare('SELECT COUNT(*) n FROM evaluations').get().n;await page.getByRole('button',{name:'AVALIAR ATENDIMENTO'}).click();
+  for(let i=0;i<6;i++){await page.locator('.rating-option[data-value="4"]').click();if(i===0)await page.screenshot({path:'output/qa/kiosk-question.png',fullPage:true});await page.getByRole('button',{name:i===5?'REVISAR':'PRÓXIMA',exact:true}).click();}
+  await page.getByRole('heading',{name:'Confira suas respostas'}).waitFor();
+  await page.route('**/api/evaluations',route=>route.abort(),{times:1});await page.getByRole('button',{name:'ENVIAR AVALIAÇÃO',exact:true}).click();await page.getByText('Suas respostas continuam aqui. Tente enviar novamente.',{exact:false}).waitFor();if(db.prepare('SELECT COUNT(*) n FROM evaluations').get().n!==count)throw Error('Network failure claimed a saved response');
+  await page.getByRole('button',{name:'TENTAR NOVAMENTE',exact:true}).click();await page.getByRole('heading',{name:'Obrigado por avaliar nosso atendimento!'}).waitFor();await page.screenshot({path:'output/qa/kiosk-success.png',fullPage:true});
+  if(db.prepare('SELECT COUNT(*) n FROM evaluations').get().n!==count+1)throw Error('Kiosk did not persist one evaluation');
+  evaluationId=db.prepare('SELECT id FROM evaluations WHERE demo=0 ORDER BY created_at DESC LIMIT 1').get().id;
+  await page.getByRole('button',{name:'AVALIAR ATENDIMENTO'}).waitFor({timeout:10000});
+  await page.setViewportSize({width:390,height:844});await page.getByRole('button',{name:'AVALIAR ATENDIMENTO'}).click();await page.screenshot({path:'output/qa/kiosk-mobile.png',fullPage:true});if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Mobile kiosk overflows');
+  await page.clock.install();await page.clock.fastForward(95000);await page.locator('#inactivity-warning').waitFor();await page.clock.fastForward(30000);await page.getByRole('button',{name:'AVALIAR ATENDIMENTO'}).waitFor();
+  await context.clearCookies();await context.addCookies([{name:'vox_session',value:token('admin'),url:origin,httpOnly:true,sameSite:'Strict'}]);await page.reload();await wait();await page.getByRole('button',{name:'Personalizado',exact:true}).click();await page.getByLabel('Data inicial').fill('2030-01-01');await page.getByLabel('Data final').fill('2030-01-07');await page.getByRole('button',{name:'Aplicar período',exact:true}).click();await wait();await page.getByRole('heading',{name:'A evolução começa com a primeira opinião',exact:true}).waitFor();await page.screenshot({path:'output/qa/empty-mobile.png',fullPage:true,animations:'disabled'});if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Empty mobile layout overflows');
+  if(errors.length)throw Error(errors.join('\n'));console.log('UI: 10 administrative pages, unit analysis, category history, unit creation, CSV/PDF downloads, responsive layouts, network failure/retry, six kiosk questions, persistence, auto-reset and inactivity timeout passed.');
+}finally{for(const t of tokens)db.prepare('DELETE FROM sessions WHERE token_hash=?').run(t);if(evaluationId)db.prepare('UPDATE evaluations SET demo=1 WHERE id=?').run(evaluationId);const unit=db.prepare('SELECT id FROM units WHERE name=?').get(testName);if(unit){db.prepare('DELETE FROM users WHERE unit_id=?').run(unit.id);db.prepare('DELETE FROM units WHERE id=?').run(unit.id);}await new Promise(resolve=>server.close(resolve));db.close();await browser.close();}

@@ -1,0 +1,16 @@
+data/
+.env
+.env.*
+!.env.example
+node_modules/
+tmp/
+output/
+*.log
+*.sqlite*
+.DS_Store
+__pycache__/
+*.py[cod]
+*.pem
+*.key
+*.pfx
+*.p12
