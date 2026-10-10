@@ -1,8 +1,11 @@
-import { openDatabase,loadEnv,audit } from '../server/db.mjs';
+import { openDatabase,loadEnv,audit,ROOT } from '../server/db.mjs';
 import { mkdirSync } from 'node:fs';
-import { resolve } from 'node:path';
-loadEnv();const db=openDatabase();mkdirSync('data/backups',{recursive:true});
-const target=resolve('data/backups',`vox-${new Date().toISOString().replace(/[:.]/g,'-')}.sqlite`);
+import { resolve,dirname } from 'node:path';
+loadEnv();const db=openDatabase();
+const databasePath=resolve(process.env.VOX_DB || resolve(ROOT,'data/vox.sqlite'));
+const directory=resolve(process.env.VOX_BACKUP_DIR || resolve(dirname(databasePath),'backups'));
+mkdirSync(directory,{recursive:true});
+const target=resolve(directory,`vox-${new Date().toISOString().replace(/[:.]/g,'-')}.sqlite`);
 db.prepare('VACUUM INTO ?').run(target);
 audit(db,null,'Backup local criado','system');db.close();
 console.log(`Backup consistente criado: ${target}`);

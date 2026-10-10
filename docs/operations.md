@@ -4,6 +4,8 @@
 
 O Vox está configurado para desenvolvimento em `127.0.0.1:3000`, com SQLite em `data/vox.sqlite`. As avaliações de teste foram removidas com backup. Cadastros e acessos foram preservados. A fotografia opcional está ativa localmente. O servidor local não deve ser exposto diretamente à internet.
 
+Para publicar o sistema completo com HTTPS a partir do GitHub, veja [Acesso pela internet](deployment.md). O template da Render usa disco persistente e provisiona um banco novo no primeiro início, a partir de senhas privadas do ambiente. Não copia o banco local.
+
 ## Antes da implantação
 
 Conforme a especificação recebida, a prefeitura deve aprovar formalmente a base legal, os avisos ao público, a minimização de dados, os perfis de acesso, os prazos de retenção, o atendimento aos direitos dos titulares e o procedimento de resposta a incidentes. A revisão se aplica à operação, mesmo sem fotos. A captura fotográfica implementada exige aprovação específica antes da implantação para pacientes.
@@ -33,7 +35,7 @@ O funcionamento em várias instâncias exige migração da persistência, sem co
 
 ## Backups e recuperação
 
-`npm run backup` executa `VACUUM INTO` e produz uma cópia consistente em `data/backups/`. Essa cópia local é uma ferramenta, não uma política completa de backup.
+`npm run backup` executa `VACUUM INTO` e produz uma cópia consistente na pasta `backups` ao lado do banco ativo (`data/backups/` localmente e `/var/data/backups/` no template da Render). `VOX_BACKUP_DIR` permite escolher outro destino. Essa cópia é uma ferramenta, não uma política completa de backup.
 
 Defina com a infraestrutura a frequência, retenção, destino externo criptografado, alertas de falha e testes periódicos de restauração. Restrinja as permissões de banco, diretório, logs e backups à conta de serviço e aos administradores autorizados. Não envie o banco por e-mail nem o coloque em armazenamento público. Em produção, prefira disco local gerenciado fora de pastas de sincronização de arquivos.
 

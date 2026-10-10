@@ -9,6 +9,8 @@ import { dashboard,period } from './analytics.mjs';
 import { detectAlerts } from './alerts.mjs';
 import { csv,pdf } from './reports.mjs';
 import { PHOTO_NOTICE_VERSION, loadPhotoKey, preparePhoto, storePhoto, decryptPhoto, deletePhoto, expirePhotos } from './photos.mjs';
+import { runtimeConfig } from './runtime.mjs';
+import { provisionFromEnv } from './bootstrap.mjs';
 
 const fail=(status,message,code)=>{throw Object.assign(new Error(message),{status,code});};
 const text=(v,label,max=150)=>{if(typeof v!=='string'||!v.trim()||v.trim().length>max)fail(400,`${label}: preencha um valor válido de até ${max} caracteres.`);return v.trim();};
@@ -36,6 +38,10 @@ export function createApp({db=openDatabase(),production=false,publicOrigin='',tr
     if(production)headers['Strict-Transport-Security']='max-age=31536000';
     const send=(status,value,type='application/json; charset=utf-8',extra={})=>{res.writeHead(status,{...headers,'Content-Type':type,...extra});res.end(type.startsWith('application/json')?JSON.stringify(value):value);};
     try {
+      // The platform's internal health probe uses HTTP and an internal Host.
+      // This public route exposes no account, configuration or database contents.
+      if(req.url?.split('?')[0]==='/api/health'&&['GET','HEAD'].includes(req.method))
+        return send(200,{status:'ok',name:'Vox'});
       if(production&&(!trustProxy||req.headers['x-forwarded-proto']!=='https'))fail(400,'A conexão segura HTTPS é obrigatória.');
       const host=req.headers.host;
       if(!host||!/^([a-zA-Z0-9.-]+|\[[a-fA-F0-9:]+\])(?::\d+)?$/.test(host))fail(400,'Endereço inválido.');
@@ -44,7 +50,6 @@ export function createApp({db=openDatabase(),production=false,publicOrigin='',tr
       const url=new URL(req.url,origin),path=url.pathname,method=req.method;
       const mutating=!['GET','HEAD'].includes(method);
       if(mutating&&req.headers.origin&&req.headers.origin!==origin)fail(403,'A origem da solicitação não foi autorizada.');
-      if(path==='/api/health')return send(200,{status:'ok',name:'Vox'});
       if(path==='/api/auth/login'&&method==='POST') {
         const b=await body(req);if(typeof b.username!=='string'||typeof b.password!=='string'||b.username.length>60||b.password.length>128)fail(400,'Informe usuário e senha válidos.');
         const {token,user}=login(db,b.username.trim(),b.password,req.socket.remoteAddress||'local');
@@ -222,13 +227,12 @@ export function createApp({db=openDatabase(),production=false,publicOrigin='',tr
   return {server,db};
 }
 if(process.argv[1] && import.meta.url===pathToFileURL(resolve(process.argv[1])).href) {
-  loadEnv();const production=process.env.NODE_ENV==='production';
-  if(production&&(process.env.LEGAL_REVIEW_APPROVED!=='true'||process.env.TRUST_PROXY!=='true'||!process.env.PUBLIC_ORIGIN?.startsWith('https://')))throw new Error('Production requires legal review approval, a trusted HTTPS reverse proxy and PUBLIC_ORIGIN. See docs/operations.md.');
-  const photoEnabled=process.env.PHOTO_CAPTURE_ENABLED==='true';
-  if(production&&photoEnabled&&process.env.PHOTO_PRIVACY_APPROVED!=='true')throw new Error('Aprovação da política de fotografias necessária em produção. Veja docs/operations.md.');
-  const {server,db}=createApp({production,publicOrigin:process.env.PUBLIC_ORIGIN||'',trustProxy:process.env.TRUST_PROXY==='true',photoEnabled});
-  if(production&&db.prepare('SELECT 1 FROM evaluations WHERE demo=1 LIMIT 1').get())throw new Error('Use a clean production database. Demonstration records must not enter production.');
+  loadEnv();const config=runtimeConfig(),db=openDatabase();
+  if(config.production&&db.prepare('SELECT 1 FROM evaluations WHERE demo=1 LIMIT 1').get())throw new Error('Use a clean production database. Demonstration records must not enter production.');
+  if(provisionFromEnv(db,process.env,{required:config.production}))console.log('Vox: acessos iniciais criados, sem avaliações fictícias. Altere as senhas provisórias no primeiro acesso.');
+  delete process.env.VOX_ADMIN_PASSWORD;delete process.env.VOX_UNIT_PASSWORD;
+  const {server}=createApp({db,...config});
   if(!db.prepare('SELECT 1 FROM users LIMIT 1').get())console.log('Vox: execute npm run setup para provisionar os acessos.');
-  server.listen(Number(process.env.PORT||3000),process.env.HOST||'127.0.0.1',()=>console.log(`Vox disponível em http://${process.env.HOST||'127.0.0.1'}:${process.env.PORT||3000}`));
+  server.listen(config.port,config.host,()=>console.log(`Vox disponível em ${config.publicOrigin || `http://${config.host}:${config.port}`}`));
   for(const signal of ['SIGINT','SIGTERM'])process.on(signal,()=>server.close(()=>{db.close();process.exit(0);}));
 }

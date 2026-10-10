@@ -4,9 +4,15 @@ Aplicação funcional para avaliar o atendimento de UBS e apoiar a gestão da Se
 
 O repositório contém apenas o código, as fontes e a documentação. Banco de dados, fotografias, backups e configurações com credenciais ficam fora do Git. Ao clonar, siga a instalação abaixo para provisionar um banco novo.
 
-## Executar
+## Acessar pela internet
 
-Requisito: **Node.js 24 ou superior**. Não há dependências de execução para instalar, serviços externos ou chaves de API.
+[Publicar o Vox na Render](https://render.com/deploy?repo=https://github.com/jeremiasthomaz8-commits/vox)
+
+O repositório está preparado para hospedar o sistema completo com HTTPS, login e banco persistente. Depois da publicação, use o link HTTPS fornecido pela Render em qualquer dispositivo. A publicação exige uma conta de hospedagem, confirmação da cobrança e as configurações privadas descritas no [guia de implantação](docs/deployment.md). O GitHub contém o código; o serviço online só existe depois de concluir essa implantação.
+
+## Executar localmente
+
+Requisito: **Node.js 24.21 ou superior da série 24.x**. Não há dependências de execução para instalar, serviços externos ou chaves de API.
 
 ```powershell
 npm start
@@ -64,7 +70,7 @@ npm test
 npm run backup
 ```
 
-Os 23 testes de integração usam bancos temporários em memória e também cobrem consentimento, criptografia, acesso protegido e retenção de fotos. Cobrem autorização, CSRF, persistência, idempotência, cálculo, filtros, transações, alertas, auditoria, exportações, senhas e bloqueio por tentativas.
+Os testes de integração usam bancos isolados em memória ou diretórios temporários. Cobrem consentimento, criptografia, acesso protegido, retenção de fotos, provisionamento da hospedagem, persistência após reinício e proxy HTTPS, além de autorização, CSRF, idempotência, cálculo, filtros, transações, alertas, auditoria, exportações, senhas e bloqueio por tentativas.
 
 Os testes visuais opcionais `node tests/ui-smoke.mjs` e `node tests/ui-photos.mjs` precisam de Playwright e Chrome. Defina `PLAYWRIGHT_MODULE` e `CHROME_PATH` para outras instalações. Ambos iniciam servidores próprios e bancos em memória, sem acessar o banco de uso. O teste fotográfico usa câmera simulada e não aciona a webcam real. As imagens de revisão ficam em `output/qa/`, sem inclusão no controle de versão.
 
@@ -88,4 +94,4 @@ O stack usa os módulos nativos do Node.js e SQLite, adequado a um MVP de proces
 
 ## Produção
 
-Esta entrega é um **ambiente local de desenvolvimento**. Não foi publicada para pacientes. A especificação exige revisão municipal antes da implantação. Aprovação jurídica e de proteção de dados, configuração de TLS, ambiente de banco limpo, backups fora da máquina, proteção do disco, rotação das credenciais e operação dos totens são etapas de implantação, documentadas em [docs/operations.md](docs/operations.md). Controles técnicos não equivalem a uma declaração automática de conformidade com a LGPD.
+O acesso local continua disponível. Para criar o endereço público, siga o [guia de implantação](docs/deployment.md) e revise o template `render.yaml`. A especificação exige revisão municipal antes da operação com pacientes. Aprovação jurídica e de proteção de dados, backups externos, proteção de chaves, rotação das credenciais e operação dos totens são etapas de implantação, documentadas em [docs/operations.md](docs/operations.md). Controles técnicos não equivalem a uma declaração automática de conformidade com a LGPD.
