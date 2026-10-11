@@ -4,7 +4,7 @@ O GitHub guarda o código. A Render executa o servidor Node.js com HTTPS e o Sup
 
 ## Preparar o projeto Supabase existente
 
-1. Aplique `supabase/migrations/202610110001_vox.sql` no SQL Editor ou por migração autenticada. O script cria somente o schema privado `vox`; não altera `public`, `auth` ou outros schemas. Execute uma vez.
+1. Aplique os arquivos SQL de `supabase/migrations/` em ordem no SQL Editor ou por migração autenticada. Os scripts criam somente o schema privado `vox` e seus índices; não alteram `public`, `auth` ou outros schemas. Execute cada migração uma vez.
 2. Aplique `supabase/vox-app-role.sql`. Configure uma senha aleatória para o usuário de banco `vox_app` por um canal privado. Guarde a conexão somente no servidor. Esse usuário não é a conta do diretor; é uma credencial de infraestrutura com permissões restritas.
 3. No painel **Connect → Direct → Session pooler**, copie o host real do projeto. Use a porta 5432 e o usuário `vox_app.PROJECT_REF`. Não deduza o host apenas pela região. Exemplo sem segredo:
 

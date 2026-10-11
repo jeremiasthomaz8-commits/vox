@@ -3,6 +3,7 @@ data/
 .env.*
 !.env.example
 node_modules/
+supabase/.temp/
 tmp/
 output/
 *.log
