@@ -9,7 +9,7 @@ export { asAsyncDatabase } from './database-adapter.mjs';
 
 // Netlify bundles modules into the function entry file. Runtime assets retain
 // their repository paths relative to the deployed function's working directory.
-export const ROOT = process.env.NETLIFY==='true' ? process.cwd() : fileURLToPath(new URL('../', import.meta.url));
+export const ROOT = process.env.LAMBDA_TASK_ROOT || (process.env.NETLIFY==='true' ? process.cwd() : fileURLToPath(new URL('../', import.meta.url)));
 export const CATEGORIES = [
   ['Atendimento da equipe', 'Como foi o atendimento da equipe?'],
   ['Atendimento médico', 'Como foi o atendimento médico?'],
