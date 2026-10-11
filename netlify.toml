@@ -1,0 +1,22 @@
+[build]
+  command = "npm run check"
+  publish = "public"
+
+[build.environment]
+  NODE_VERSION = "24.21.0"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "nft"
+  included_files = ["server/assets/fonts/**", "supabase/certs/*.crt", "!.env", "!.env.*", "!data/**", "!.git/**", "!tmp/**", "!output/**"]
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "same-origin"
+    Permissions-Policy = "camera=(self), microphone=(), geolocation=()"
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    Strict-Transport-Security = "max-age=31536000"
+    Cache-Control = "no-store"

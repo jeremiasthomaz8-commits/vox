@@ -1,7 +1,7 @@
 // Resolve deployment settings without depending on a particular hosting provider.
 export function runtimeConfig(env=process.env) {
-  const production=env.NODE_ENV==='production',render=env.RENDER==='true';
-  const value=env.PUBLIC_ORIGIN || (render?env.RENDER_EXTERNAL_URL:'') || '';
+  const production=env.NODE_ENV==='production',netlify=env.NETLIFY==='true';
+  const value=env.PUBLIC_ORIGIN || (netlify?env.URL:'') || '';
   let publicOrigin='';
   if(value) {
     let url;
@@ -12,10 +12,10 @@ export function runtimeConfig(env=process.env) {
   }
   const trustProxy=env.TRUST_PROXY==='true',photoEnabled=env.PHOTO_CAPTURE_ENABLED==='true';
   if(production&&(env.LEGAL_REVIEW_APPROVED!=='true'||!trustProxy||!publicOrigin.startsWith('https://')))
-    throw Error('Produção exige revisão municipal aprovada, proxy HTTPS confiável e PUBLIC_ORIGIN (ou RENDER_EXTERNAL_URL). Veja docs/deployment.md.');
+    throw Error('Produção exige revisão municipal aprovada, proxy HTTPS confiável e PUBLIC_ORIGIN. Veja docs/deployment.md.');
   if(production&&photoEnabled&&env.PHOTO_PRIVACY_APPROVED!=='true')
     throw Error('Aprovação da política de fotografias necessária em produção. Veja docs/operations.md.');
-  const port=Number(env.PORT || (render?10000:3000));
+  const port=Number(env.PORT || 3000);
   if(!Number.isInteger(port)||port<1||port>65535)throw Error('PORT deve ser um inteiro de 1 a 65535.');
-  return {production,publicOrigin,trustProxy,photoEnabled,host:env.HOST || (render?'0.0.0.0':'127.0.0.1'),port};
+  return {production,publicOrigin,trustProxy,photoEnabled,host:env.HOST || '127.0.0.1',port};
 }

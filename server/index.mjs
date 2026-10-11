@@ -22,12 +22,12 @@ async function body(req,limit=16384) {
   for await(const chunk of req){size+=chunk.length;if(size>limit)fail(413,'O envio excede o tamanho permitido.');chunks.push(chunk);}
   try {const value=JSON.parse(Buffer.concat(chunks).toString());if(!value||Array.isArray(value)||typeof value!=='object')throw Error();return value;}catch{fail(400,'Não foi possível ler os dados enviados.');}
 }
-export async function createApp({db=null,production=false,publicOrigin='',trustProxy=false,photoEnabled=false,photoKey=null}={}) {
+export async function createApp({db=null,production=false,publicOrigin='',trustProxy=false,photoEnabled=false,photoKey=null,retentionInterval=true}={}) {
   db=asAsyncDatabase(db||await connectDatabase());
   const hasPhotos=!!(await db.prepare("SELECT 1 FROM photographic_evidence WHERE status='captured' LIMIT 1").get());
   if((photoEnabled||hasPhotos)&&!photoKey)photoKey=loadPhotoKey(production);
   (await expirePhotos(db));
-  const retentionTimer=setInterval(async ()=>{try{(await expirePhotos(db));}catch{console.error('photo_retention_failed');}},600000);retentionTimer.unref();
+  const retentionTimer=retentionInterval?setInterval(async ()=>{try{(await expirePhotos(db));}catch{console.error('photo_retention_failed');}},600000):null;retentionTimer?.unref();
   const server=http.createServer(async(req,res)=>{
     const started=Date.now();
     const headers={

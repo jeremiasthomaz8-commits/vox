@@ -4,7 +4,7 @@
 
 O Vox está configurado para desenvolvimento em `127.0.0.1:3000`, com SQLite em `data/vox.sqlite`. As avaliações de teste foram removidas com backup. Cadastros e acessos foram preservados. A fotografia opcional está ativa localmente. O servidor local não deve ser exposto diretamente à internet.
 
-Para publicar o sistema completo com HTTPS a partir do GitHub, veja [Acesso pela internet](deployment.md). O template da Render usa PostgreSQL do Supabase e não precisa de disco persistente. O script de migração preserva os cadastros e hashes das senhas existentes; sessões precisam de novo login. Consulte o guia de implantação para a conexão privada e os backups do Supabase.
+Para publicar o sistema completo com HTTPS a partir do GitHub, veja [Acesso pela internet](deployment.md). A configuração Netlify Free usa PostgreSQL do Supabase e dispensa disco persistente. Respeite as cotas gratuitas, que podem pausar o projeto ao atingir seus limites. O script de migração preserva os cadastros e hashes das senhas existentes; sessões precisam de novo login. Consulte o guia de implantação para a conexão privada e os backups do Supabase.
 
 ## Antes da implantação
 

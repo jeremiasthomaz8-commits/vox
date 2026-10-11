@@ -14,12 +14,12 @@ import { verifyPassword } from '../server/auth.mjs';
 const approved={NODE_ENV:'production',TRUST_PROXY:'true',LEGAL_REVIEW_APPROVED:'true',PHOTO_CAPTURE_ENABLED:'false',PUBLIC_ORIGIN:'https://vox.example.test'};
 const credentials=()=>({VOX_ADMIN_PASSWORD:'Admin-'+randomUUID(),VOX_UNIT_PASSWORD:'Unit-'+randomUUID()});
 
-test('runtime resolves Render HTTPS origin and binding without changing local defaults',()=>{
+test('runtime resolves Netlify HTTPS origin without changing local defaults',()=>{
   assert.deepEqual(runtimeConfig({}),{production:false,publicOrigin:'',trustProxy:false,photoEnabled:false,host:'127.0.0.1',port:3000});
-  const config=runtimeConfig({...approved,PUBLIC_ORIGIN:'',RENDER:'true',RENDER_EXTERNAL_URL:'https://vox-example.onrender.com/'});
-  assert.equal(config.publicOrigin,'https://vox-example.onrender.com');assert.equal(config.host,'0.0.0.0');assert.equal(config.port,10000);
-  assert.equal(runtimeConfig({...approved,RENDER:'true',RENDER_EXTERNAL_URL:'https://ignored.onrender.com'}).publicOrigin,approved.PUBLIC_ORIGIN);
-  assert.throws(()=>runtimeConfig({...approved,PUBLIC_ORIGIN:'',RENDER_EXTERNAL_URL:'https://ignored.onrender.com'}));
+  const config=runtimeConfig({...approved,PUBLIC_ORIGIN:'',NETLIFY:'true',URL:'https://vox-example.netlify.app/'});
+  assert.equal(config.publicOrigin,'https://vox-example.netlify.app');assert.equal(config.host,'127.0.0.1');assert.equal(config.port,3000);
+  assert.equal(runtimeConfig({...approved,NETLIFY:'true',URL:'https://ignored.netlify.app'}).publicOrigin,approved.PUBLIC_ORIGIN);
+  assert.throws(()=>runtimeConfig({...approved,PUBLIC_ORIGIN:'',URL:'https://ignored.netlify.app'}));
 });
 
 test('production rejects absent approvals, untrusted proxies, malformed origins and ports',()=>{
@@ -102,12 +102,12 @@ function removeTestDirectory(directory) {
 test('production start, independent device sessions, HTTPS checks, restart persistence and consistent backup',{timeout:30000},async()=>{
   const directory=mkdtempSync(join(tmpdir(),'vox-deployment-')),filename=join(directory,'vox.sqlite'),port=await unusedPort();
   const secrets=credentials(),origin=approved.PUBLIC_ORIGIN;
-  const env={...approved,...secrets,PUBLIC_ORIGIN:'',RENDER:'true',RENDER_EXTERNAL_URL:origin,HOST:'127.0.0.1',PORT:String(port),VOX_DATABASE:'sqlite',DATABASE_URL:'',VOX_DB:filename};
+  const env={...approved,...secrets,PUBLIC_ORIGIN:origin,HOST:'127.0.0.1',PORT:String(port),VOX_DATABASE:'sqlite',DATABASE_URL:'',VOX_DB:filename};
   const forwarded={host:new URL(origin).host,'x-forwarded-proto':'https'};
   let running;
   try {
     running=await start(env);
-    const health=await request(port,'/api/health',{headers:{host:'internal.render.test'}});
+    const health=await request(port,'/api/health',{headers:{host:'internal.platform.test'}});
     assert.equal(health.status,200);assert.deepEqual(health.body,{status:'ok',name:'Vox'});
     const head=await request(port,'/api/health',{method:'HEAD'});assert.equal(head.status,200);assert.equal(head.body,'');
     assert.equal((await request(port,'/api/health',{method:'POST'})).status,400);

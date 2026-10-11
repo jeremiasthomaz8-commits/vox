@@ -6,9 +6,9 @@ O repositório contém apenas o código, as fontes e a documentação. Banco de 
 
 ## Acessar pela internet
 
-[Publicar o Vox na Render](https://render.com/deploy?repo=https://github.com/jeremiasthomaz8-commits/vox)
+[Publicar o Vox na Netlify Free](https://app.netlify.com/)
 
-O repositório está preparado para hospedar o sistema completo com HTTPS, login e banco persistente. Depois da publicação, use o link HTTPS fornecido pela Render em qualquer dispositivo. A publicação exige uma conta de hospedagem, confirmação da cobrança e as configurações privadas descritas no [guia de implantação](docs/deployment.md). O GitHub contém o código; o serviço online só existe depois de concluir essa implantação.
+O projeto está preparado para **Netlify Free + Supabase Free**, com HTTPS, login e banco compartilhado, sem mensalidade. Importe este repositório na Netlify e configure as variáveis privadas conforme o [guia de implantação](docs/deployment.md). Depois da publicação, abra a URL HTTPS `.netlify.app` em qualquer dispositivo. Na Netlify, atingir a cota mensal gratuita pausa o site, sem cobrança automática de excedentes. O GitHub guarda o código; o endereço público depende de concluir a implantação.
 
 ## Executar localmente
 
@@ -47,7 +47,7 @@ O setup pergunta os usuários e as senhas sem mostrar as senhas digitadas. Use `
 - Autenticação com sessões no servidor, cookies HttpOnly, proteção CSRF, limite de tentativas e separação de perfis em todas as APIs.
 - Totem de seis perguntas, notas de 1 a 5, navegação com respostas preservadas, revisão, confirmação e reinício após 7 segundos. Abandono reinicia após 120 segundos, com aviso aos 90 segundos.
 - Envio transacional, unidade determinada pelo usuário autenticado e idempotência para repetição de envios. Falhas não produzem uma confirmação falsa de recebimento.
-- Dashboard com scores, satisfação, contagem de avaliações, ranking, prioridades, evolução temporal, categorias e volume. Todos usam SQLite e filtros de período e unidade.
+- Dashboard com scores, satisfação, contagem de avaliações, ranking, prioridades, evolução temporal, categorias e volume. Todos usam o banco compartilhado e filtros de período e unidade.
 - Cadastro e edição de UBS, CNES e endereço, ativação, identificador de dispositivo, criação de acesso e redefinição de senha.
 - Análise de unidade, comparação com a média municipal, evolução de cada categoria, registros recentes e prioridades calculadas por regras explícitas.
 - Comparação de duas ou mais unidades, com os seis critérios e tamanho da amostra.
@@ -61,7 +61,7 @@ Ativas localmente por `PHOTO_CAPTURE_ENABLED=true`. No fim da avaliação, o pac
 
 No acesso do diretor, abra **Fotografias**, filtre por período, unidade ou status e toque em **Ver foto**. Os detalhes da avaliação também permitem abrir a foto. Cada leitura exige sessão de diretor e gera auditoria. As imagens são criptografadas com AES-256-GCM em uma tabela privada do banco. O diretor pode excluir a foto preservando as notas. Relatórios não incluem fotografias.
 
-A retenção padrão é de 30 dias, configurável. O servidor exclui fotos vencidas ao iniciar, a cada dez minutos e antes de consultas. Veja [operação](docs/operations.md) para permissões, proteção de chaves, backups e produção.
+A retenção padrão é de 30 dias, configurável. O servidor exclui fotos vencidas ao iniciar e antes de consultas. Localmente verifica a cada dez minutos; na Netlify uma função agendada realiza essa verificação enquanto o projeto estiver ativo. Veja [operação](docs/operations.md) para permissões, proteção de chaves, backups e produção.
 
 ## Verificar
 
@@ -97,4 +97,4 @@ O servidor Node.js usa PostgreSQL do Supabase para a operação online, através
 
 ## Produção
 
-O acesso local continua disponível. Para criar o endereço público, siga o [guia de implantação](docs/deployment.md) e revise o template `render.yaml`. A especificação exige revisão municipal antes da operação com pacientes. Aprovação jurídica e de proteção de dados, backups externos, proteção de chaves, rotação das credenciais e operação dos totens são etapas de implantação, documentadas em [docs/operations.md](docs/operations.md). Controles técnicos não equivalem a uma declaração automática de conformidade com a LGPD.
+O acesso local continua disponível. Para criar o endereço público, siga o [guia de implantação](docs/deployment.md) e revise a configuração `netlify.toml`. A especificação exige revisão municipal antes da operação com pacientes. Aprovação jurídica e de proteção de dados, backups externos, proteção de chaves, rotação das credenciais e operação dos totens são etapas de implantação, documentadas em [docs/operations.md](docs/operations.md). Controles técnicos não equivalem a uma declaração automática de conformidade com a LGPD.

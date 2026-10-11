@@ -1,8 +1,10 @@
 import { scoreFromAverage } from './analytics.mjs';
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { ROOT } from './db.mjs';
 
-const soraBytes=readFileSync(new URL('./assets/fonts/Sora-Regular.ttf',import.meta.url));
-const sora=JSON.parse(readFileSync(new URL('./assets/fonts/Sora-Regular.metrics.json',import.meta.url),'utf8'));
+const soraBytes=readFileSync(resolve(ROOT,'server/assets/fonts/Sora-Regular.ttf'));
+const sora=JSON.parse(readFileSync(resolve(ROOT,'server/assets/fonts/Sora-Regular.metrics.json'),'utf8'));
 const plainText=s=>s.replace(/[—–]/g,'-').replace(/[^\x20-\xff]/g,' ');
 const textWidth=(text,size)=>[...plainText(text)].reduce((sum,c)=>sum+(sora.widths[c.charCodeAt(0)-sora.firstChar]??sora.widths[31])*size/1000,0);
 

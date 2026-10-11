@@ -7,7 +7,9 @@ import { localDay } from './analytics.mjs';
 import { asAsyncDatabase, openPostgres } from './database-adapter.mjs';
 export { asAsyncDatabase } from './database-adapter.mjs';
 
-export const ROOT = fileURLToPath(new URL('../', import.meta.url));
+// Netlify bundles modules into the function entry file. Runtime assets retain
+// their repository paths relative to the deployed function's working directory.
+export const ROOT = process.env.NETLIFY==='true' ? process.cwd() : fileURLToPath(new URL('../', import.meta.url));
 export const CATEGORIES = [
   ['Atendimento da equipe', 'Como foi o atendimento da equipe?'],
   ['Atendimento médico', 'Como foi o atendimento médico?'],
@@ -51,7 +53,7 @@ export async function connectDatabase(env=process.env) {
   if(provider!=='supabase')throw Error('VOX_DATABASE deve ser sqlite ou supabase.');
   if(!env.DATABASE_URL)throw Error('Configure DATABASE_URL para conectar ao Supabase.');
   const ca=env.DATABASE_CA_CERT||readFileSync(resolve(ROOT,'supabase/certs/prod-ca-2021.crt'),'utf8');
-  const db=openPostgres(env.DATABASE_URL,ca);
+  const db=openPostgres(env.DATABASE_URL,ca,{serverless:env.NETLIFY==='true'});
   try {
     if(!(await db.prepare('SELECT version FROM schema_migrations WHERE version=1').get()))throw Error('Aplique a migração do Vox no Supabase antes de iniciar.');
     return db;

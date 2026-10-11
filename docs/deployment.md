@@ -1,60 +1,74 @@
-# Acesso pela internet com Supabase
+# Acesso gratuito pela internet com Supabase
 
-O GitHub guarda o código. A Render executa o servidor Node.js com HTTPS e o Supabase guarda os dados compartilhados. Todos os dispositivos usam a URL HTTPS da aplicação, com sessões independentes. O banco e as fotografias criptografadas ficam no PostgreSQL; não é necessário disco persistente na Render.
+O GitHub guarda o código, a Netlify Free publica a interface e executa a API Node.js, e o Supabase Free guarda os dados compartilhados. Todos os dispositivos usam o mesmo endereço HTTPS, com sessões independentes. Avaliações, contas, auditoria e fotografias criptografadas permanecem no PostgreSQL privado. Não é necessário contratar servidor nem disco na Render.
+
+## Plano gratuito e limites
+
+Escolha **Free** na Netlify e mantenha o projeto Supabase no plano **Free**. Não selecione testes de planos pagos, upgrades, complementos ou recarga de créditos. Os preços consultados em 11/10/2026 indicam US$ 0 para ambos os planos. A Netlify Free oferece 300 créditos por mês com limite rígido: ao atingir o limite, os projetos da conta pausam até o próximo ciclo, sem cobrança automática de excedentes. Publicações, tráfego e execução das funções consomem esses créditos. Consulte o painel de uso antes de publicar novas versões.
+
+O Supabase também tem limites gratuitos de armazenamento, conexões e tráfego, e pode pausar projetos inativos. Fotografias ocupam espaço no banco. A disponibilidade e a capacidade dependem das cotas dos dois provedores; esta configuração não contrata planos pagos para ultrapassá-las.
 
 ## Preparar o projeto Supabase existente
 
-1. Aplique os arquivos SQL de `supabase/migrations/` em ordem no SQL Editor ou por migração autenticada. Os scripts criam somente o schema privado `vox` e seus índices; não alteram `public`, `auth` ou outros schemas. Execute cada migração uma vez.
-2. Aplique `supabase/vox-app-role.sql`. Configure uma senha aleatória para o usuário de banco `vox_app` por um canal privado. Guarde a conexão somente no servidor. Esse usuário não é a conta do diretor; é uma credencial de infraestrutura com permissões restritas.
-3. No painel **Connect → Direct → Session pooler**, copie o host real do projeto. Use a porta 5432 e o usuário `vox_app.PROJECT_REF`. Não deduza o host apenas pela região. Exemplo sem segredo:
+Este projeto já teve os cadastros e acessos migrados. **Não execute novamente a importação em um banco preenchido.** Para uma instalação nova:
+
+1. Aplique os arquivos SQL de `supabase/migrations/` em ordem, uma vez cada. Eles criam somente o schema privado `vox`, sem alterar `public`, `auth` ou outros schemas.
+2. Aplique `supabase/vox-app-role.sql` e configure uma senha aleatória para `vox_app` por canal privado. Essa credencial restrita é exclusiva da infraestrutura e não é a senha do diretor.
+3. No painel **Connect → Transaction pooler**, copie o host real do projeto, a porta 6543 e o usuário `vox_app.PROJECT_REF`. O pooler transacional é adequado às funções temporárias da Netlify. Não deduza o host pela região.
 
 ```dotenv
 VOX_DATABASE=supabase
-DATABASE_URL=postgresql://vox_app.PROJECT_REF:SENHA_PRIVADA@HOST_DO_SESSION_POOLER:5432/postgres
+DATABASE_URL=postgresql://vox_app.PROJECT_REF:SENHA_PRIVADA@HOST_DO_POOLER:6543/postgres
 ```
 
-O driver `pg` verifica a cadeia TLS e o nome do servidor. O certificado público oficial em `supabase/certs/prod-ca-2021.crt` foi obtido do download indicado pelo painel Supabase, com SHA-256 `807025ad50d4ed219d2c9c7d299c004f824eb00cf7f65afef607d07b72e6cafa`, válido até abril de 2031. `DATABASE_CA_CERT` permite substituir a CA por PEM, inclusive com separadores literais `\n`. Atualize a CA conforme orientação do provedor; não desative a verificação TLS.
+O driver `pg` verifica a cadeia TLS e o nome do servidor. O certificado público oficial em `supabase/certs/prod-ca-2021.crt` foi obtido pelo download indicado no painel Supabase, SHA-256 `807025ad50d4ed219d2c9c7d299c004f824eb00cf7f65afef607d07b72e6cafa`, válido até abril de 2031. `DATABASE_CA_CERT` permite substituir a CA por PEM. Atualize a CA conforme o provedor; não desative a verificação TLS.
 
-As tabelas têm RLS. `anon`, `authenticated` e `PUBLIC` não têm acesso ao schema. O navegador conversa com a API autenticada do Vox; não recebe a conexão PostgreSQL. Não adicione `vox` aos schemas expostos pela Data API.
+Todas as tabelas têm RLS. `anon`, `authenticated` e `PUBLIC` não têm acesso ao schema. O navegador usa a API autenticada do Vox e nunca recebe a conexão PostgreSQL. Não adicione `vox` aos schemas expostos pela Data API. O servidor usa consultas parametrizadas sem prepared statements nomeados, transações no mesmo cliente e bloqueios transacionais compatíveis com o pooler.
 
-## Migrar o banco local
+## Publicar na Netlify Free
 
-Pare o servidor local durante a transferência para evitar novos envios no banco antigo. Preserve a chave fotográfica original em `PHOTO_ENCRYPTION_KEY` caso existam imagens. Configure a conexão privada e execute:
+1. Entre em [Netlify](https://app.netlify.com/) com sua conta. Escolha **Free** se precisar criar uma equipe.
+2. Importe o repositório `jeremiasthomaz8-commits/vox`, branch `main`. O `netlify.toml` define o build `npm run check`, diretório público `public` e funções `netlify/functions`. A versão do Node é 24.21.0.
+3. Configure as variáveis abaixo no painel privado da Netlify. Use o contexto **Production** para as credenciais; não disponibilize o banco real para previews de alterações não revisadas. Credenciais nunca entram no Git, arquivos de build públicos ou JavaScript da interface.
+4. Publique a versão de produção e habilite o acesso público, se o painel apresentar essa etapa. Use a URL HTTPS `.netlify.app` em qualquer navegador, computador, tablet ou celular.
+
+| Variável | Valor/finalidade |
+| --- | --- |
+| `NODE_ENV` | `production` |
+| `VOX_DATABASE` | `supabase` |
+| `DATABASE_URL` | Conexão privada de `vox_app` pelo transaction pooler, porta 6543 |
+| `TRUST_PROXY` | `true` |
+| `PUBLIC_ORIGIN` | URL HTTPS principal do projeto, por exemplo `https://vox-exemplo.netlify.app` |
+| `LEGAL_REVIEW_APPROVED` | `true`, após a revisão municipal |
+| `PHOTO_CAPTURE_ENABLED` | `true`, para habilitar o fluxo fotográfico |
+| `PHOTO_PRIVACY_APPROVED` | `true`, após a aprovação da política fotográfica |
+| `PHOTO_ENCRYPTION_KEY` | Chave original de 32 bytes em base64, preservada fora do banco |
+| `AWS_LAMBDA_JS_RUNTIME` | `nodejs24.x`, definido pelo painel/CLI, se necessário explicitar o runtime |
+
+As aprovações municipais deste projeto foram confirmadas pelo responsável. Não gere outra chave se já houver fotografias: uma chave diferente torna as imagens existentes ilegíveis. Os acessos migrados continuam com as mesmas senhas. A publicação não cria contas nem avaliações de demonstração. Contas ainda com senha provisória precisam alterá-la ao entrar.
+
+A API usa o formato moderno de funções `Request`/`Response`, sem iniciar um servidor permanente. O adaptador preserva cookies seguros, CSRF, verificação de origem/Host, IP informado pela plataforma, permissões por perfil, idempotência, auditoria e arquivos binários de fotos/PDF. Cada instância mantém no máximo uma conexão PostgreSQL, com encerramento rápido de conexões ociosas. As fontes Sora e a CA pública são incluídas no pacote privado das funções.
+
+A função agendada `photo-retention` verifica a exclusão de fotos vencidas a cada dez minutos em produção. A API também verifica o vencimento ao iniciar e antes de listar/abrir imagens. Agendamentos dependem de o projeto estar ativo e dentro da cota. O navegador exige sua própria permissão de câmera e a fotografia permanece opcional para o paciente.
+
+`PUBLIC_ORIGIN` restringe o acesso ao domínio principal. Na ausência dessa variável, a função usa a URL principal informada pela Netlify. Para domínio próprio, altere a variável para o domínio HTTPS autorizado e publique novamente.
+
+## Verificação e atualizações
 
 ```powershell
-node --env-file=.env.supabase scripts/migrate-supabase.mjs
+npm run check
+npm test
+npm run test:postgres
 ```
 
-O script faz um backup consistente antes da importação e exige tabelas Vox vazias. Transfere unidades, contas com os mesmos hashes de senha, avaliações, respostas, fotos criptografadas, alertas, histórico, configurações e auditoria em uma transação. Confere contagens e recusa avaliações de demonstração. Sessões e tentativas de login não são transferidas; entre novamente. O SQLite original é preservado. O destino preenchido nunca é sobrescrito.
+Os testes usam SQLite ou PostgreSQL PGlite isolados, sem inserir avaliações fictícias no projeto Supabase em uso. Incluem o adaptador de funções, login/logout, cookies, CSRF, origem HTTPS, captura opcional, criptografia, acesso do diretor, bytes de fotos e PDF, exportação CSV e reenvios idempotentes.
 
-## Publicar o servidor na Render
+Depois da publicação, verifique `/api/health`, a tela de login e os dois perfis com os acessos atuais. Confira **Usage & billing** para manter o plano Free. Uma publicação de produção consome créditos: evite implantações repetidas sem necessidade e restrinja builds automáticos conforme o uso da equipe.
 
-[Publicar o Vox na Render](https://render.com/deploy?repo=https://github.com/jeremiasthomaz8-commits/vox)
+## Backup e migração local
 
-O `render.yaml` configura Node.js 24, build `npm ci --omit=dev && npm run check`, início `npm start`, saúde `/api/health` e uma instância em Virginia, próxima ao Supabase deste projeto. O plano `0.5c-512mb` tem base de US$ 7/mês conforme a tabela consultada em 10/10/2026; não há cobrança de disco neste template. Os custos do Supabase seguem o plano do projeto existente. Revise os valores no painel do provedor.
+Preserve exportações privadas do Supabase e teste a recuperação. A chave fotográfica deve ser recuperável separadamente. A exclusão de uma foto na aplicação não elimina cópias de backups anteriores, cuja retenção segue a política operacional. `npm run backup` é exclusivo do SQLite local e recusa o modo Supabase.
 
-Configure as variáveis privadas no painel da Render:
+Para importar uma instalação local nova, pare o servidor durante a transferência, preserve a chave original e execute `node --env-file=.env.supabase scripts/migrate-supabase.mjs`. O script faz backup e exige o destino vazio. Transfere os cadastros, hashes de senha e demais dados em uma transação; recusa demonstrações e nunca sobrescreve um destino preenchido. Sessões não são transferidas; entre novamente. O SQLite original é preservado.
 
-| Variável | Finalidade |
-| --- | --- |
-| `DATABASE_URL` | Conexão privada do usuário `vox_app` pelo session pooler |
-| `PHOTO_ENCRYPTION_KEY` | Chave original de 32 bytes em base64; preserve fora do banco |
-| `LEGAL_REVIEW_APPROVED` | `true` após a revisão municipal |
-| `PHOTO_PRIVACY_APPROVED` | `true` após a aprovação da política fotográfica |
-| `VOX_ADMIN_PASSWORD`, `VOX_UNIT_PASSWORD` | Somente para provisionar um banco sem contas; desnecessárias após migração |
-
-Não gere outra chave se já houver fotos. Chaves diferentes tornam imagens existentes ilegíveis. As aprovações para este projeto foram confirmadas pelo responsável; mantenha o registro municipal correspondente.
-
-Após o estado **Live**, use a URL HTTPS `.onrender.com` em computadores, tablets ou celulares. O repositório e `127.0.0.1` não são o endereço público. Valide os perfis da direção e da unidade. O navegador exige sua própria permissão de câmera e fotografias permanecem opcionais para o paciente.
-
-O modo `supabase` recusa iniciar sem conexão ou migração; nunca cria um SQLite de substituição. Reinícios usam o mesmo banco remoto. O template desativa implantação automática; após testes e push, use **Manual Deploy → Deploy latest commit**. Se utilizar o plano gratuito, considere as suspensões por inatividade e limites documentados pela Render e pelo Supabase antes da operação com pacientes.
-
-## Verificação, recuperação e domínio
-
-Execute `npm test` e `npm run test:postgres` antes das atualizações. Os testes PostgreSQL usam PGlite isolado com o papel restrito do servidor, sem avaliações fictícias no projeto real. Incluem transações, fotos, permissões, migração e reenvios simultâneos. Faça também a verificação da conexão TLS com o Supabase real.
-
-Use backups/exportações privados do Supabase conforme o plano, com retenção definida e restauração testada. A chave das fotos deve ser recuperável separadamente. `npm run backup` é exclusivo do SQLite local e recusa o modo Supabase. A exclusão de uma foto no sistema não remove cópias anteriores dos backups; sua retenção segue a política operacional. Monitore capacidade do banco, especialmente o volume de imagens.
-
-O servidor adota `RENDER_EXTERNAL_URL` como origem HTTPS. Para domínio próprio, defina `PUBLIC_ORIGIN=https://seu-dominio` e use esse domínio. A validação de Host, HTTPS e origem continua ativa.
-
-Referências: [conexões Supabase](https://supabase.com/docs/guides/database/connecting-to-postgres), [TLS Supabase](https://supabase.com/docs/guides/platform/ssl-enforcement), [Blueprints Render](https://render.com/docs/blueprint-spec) e [preços Render](https://render.com/pricing).
+Referências: [Netlify Free e cotas](https://www.netlify.com/pricing/), [planos baseados em créditos](https://docs.netlify.com/manage/accounts-and-billing/billing/billing-for-credit-based-plans/credit-based-pricing-plans/), [funções Netlify](https://docs.netlify.com/build/functions/configuration/), [pooler Supabase](https://supabase.com/docs/guides/database/connecting-to-postgres) e [Supabase Free](https://supabase.com/pricing).

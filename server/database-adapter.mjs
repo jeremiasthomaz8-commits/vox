@@ -55,8 +55,8 @@ export function postgresConnectionOptions(url,ca) {
   for(const key of ['sslmode','sslcert','sslkey','sslrootcert'])parsed.searchParams.delete(key);
   return {connectionString:parsed.toString(),ssl:{rejectUnauthorized:true,...ca?{ca:ca.replaceAll('\\n','\n')}:{}},max:5,connectionTimeoutMillis:15000,idleTimeoutMillis:30000,application_name:'vox'};
 }
-export function openPostgres(url,ca) {
-  const pool=new pg.Pool(postgresConnectionOptions(url,ca));
+export function openPostgres(url,ca,{serverless=false}={}) {
+  const pool=new pg.Pool({...postgresConnectionOptions(url,ca),...serverless?{max:1,idleTimeoutMillis:1000,allowExitOnIdle:true}:{}});
   pool.on('error',()=>console.error('database_pool_error'));
   return postgresAdapter(pool);
 }
