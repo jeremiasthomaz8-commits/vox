@@ -31,37 +31,37 @@ test('production rejects absent approvals, untrusted proxies, malformed origins 
   assert.equal(runtimeConfig({...approved,PHOTO_CAPTURE_ENABLED:'true',PHOTO_PRIVACY_APPROVED:'true'}).photoEnabled,true);
 });
 
-test('cloud provisioning validates secrets before writing and keeps a fresh database empty',()=>{
+test('cloud provisioning validates secrets before writing and keeps a fresh database empty',async ()=>{
   const db=openDatabase(':memory:');
   try {
-    assert.equal(provisionFromEnv(db,{}),false);
+    assert.equal((await provisionFromEnv(db,{})),false);
     for(const env of [{},{VOX_ADMIN_PASSWORD:'too-short'},{...credentials(),VOX_UNIT_USERNAME:'Bad user'},
       {...credentials(),VOX_ADMIN_USERNAME:'SameUser',VOX_UNIT_USERNAME:'sameuser'}]) {
-      assert.throws(()=>provisionFromEnv(db,env,{required:true}));
-      for(const table of ['users','units','evaluations','audit_logs'])assert.equal(db.prepare(`SELECT COUNT(*) n FROM ${table}`).get().n,0);
+      (await assert.rejects(async ()=>(await provisionFromEnv(db,env,{required:true}))));
+      for(const table of ['users','units','evaluations','audit_logs'])assert.equal((await db.prepare(`SELECT COUNT(*) n FROM ${table}`).get()).n,0);
     }
-    const env=credentials();assert.equal(provisionFromEnv(db,env,{required:true}),true);
-    const users=db.prepare('SELECT * FROM users ORDER BY role').all();assert.equal(users.length,2);
+    const env=credentials();assert.equal((await provisionFromEnv(db,env,{required:true})),true);
+    const users=(await db.prepare('SELECT * FROM users ORDER BY role').all());assert.equal(users.length,2);
     assert.equal(users[0].username,'admregulacaodiretor');assert.equal(users[0].unit_id,null);assert.equal(users[1].username,'UBSMonterrey');
     assert.ok(users.every(u=>u.must_change===1));assert.ok(verifyPassword(env.VOX_ADMIN_PASSWORD,users[0].password_hash));
     assert.ok(verifyPassword(env.VOX_UNIT_PASSWORD,users[1].password_hash));
-    assert.equal(db.prepare('SELECT COUNT(*) n FROM evaluations').get().n,0);
-    assert.equal(db.prepare('SELECT COUNT(*) n FROM categories').get().n,6);
-    const audit=JSON.stringify(db.prepare('SELECT * FROM audit_logs').all());
+    assert.equal((await db.prepare('SELECT COUNT(*) n FROM evaluations').get()).n,0);
+    assert.equal((await db.prepare('SELECT COUNT(*) n FROM categories').get()).n,6);
+    const audit=JSON.stringify((await db.prepare('SELECT * FROM audit_logs').all()));
     assert.ok(!audit.includes(env.VOX_ADMIN_PASSWORD));assert.ok(!audit.includes(env.VOX_UNIT_PASSWORD));
-    assert.equal(provisionFromEnv(db,{}, {required:true}),false);
-    assert.equal(provisionFromEnv(db,credentials(),{required:true}),false);
-    assert.deepEqual(db.prepare('SELECT * FROM users ORDER BY role').all(),users);
-  }finally{db.close();}
+    assert.equal((await provisionFromEnv(db,{}, {required:true})),false);
+    assert.equal((await provisionFromEnv(db,credentials(),{required:true})),false);
+    assert.deepEqual((await db.prepare('SELECT * FROM users ORDER BY role').all()),users);
+  }finally{(await db.close());}
 });
 
-test('failed provisioning rolls back both accounts and the initial audit',()=>{
+test('failed provisioning rolls back both accounts and the initial audit',async ()=>{
   const db=openDatabase(':memory:');
   try {
-    db.exec("CREATE TRIGGER reject_unit BEFORE INSERT ON users WHEN NEW.role='unit' BEGIN SELECT RAISE(ABORT,'test rollback'); END;");
-    assert.throws(()=>provisionFromEnv(db,credentials(),{required:true}));
-    for(const table of ['users','units','audit_logs'])assert.equal(db.prepare(`SELECT COUNT(*) n FROM ${table}`).get().n,0);
-  }finally{db.close();}
+    (await db.exec("CREATE TRIGGER reject_unit BEFORE INSERT ON users WHEN NEW.role='unit' BEGIN SELECT RAISE(ABORT,'test rollback'); END;"));
+    (await assert.rejects(async ()=>(await provisionFromEnv(db,credentials(),{required:true}))));
+    for(const table of ['users','units','audit_logs'])assert.equal((await db.prepare(`SELECT COUNT(*) n FROM ${table}`).get()).n,0);
+  }finally{(await db.close());}
 });
 
 function request(port,path,{method='GET',headers={},data}={}) {
@@ -102,7 +102,7 @@ function removeTestDirectory(directory) {
 test('production start, independent device sessions, HTTPS checks, restart persistence and consistent backup',{timeout:30000},async()=>{
   const directory=mkdtempSync(join(tmpdir(),'vox-deployment-')),filename=join(directory,'vox.sqlite'),port=await unusedPort();
   const secrets=credentials(),origin=approved.PUBLIC_ORIGIN;
-  const env={...approved,...secrets,PUBLIC_ORIGIN:'',RENDER:'true',RENDER_EXTERNAL_URL:origin,HOST:'127.0.0.1',PORT:String(port),VOX_DB:filename};
+  const env={...approved,...secrets,PUBLIC_ORIGIN:'',RENDER:'true',RENDER_EXTERNAL_URL:origin,HOST:'127.0.0.1',PORT:String(port),VOX_DATABASE:'sqlite',DATABASE_URL:'',VOX_DB:filename};
   const forwarded={host:new URL(origin).host,'x-forwarded-proto':'https'};
   let running;
   try {
@@ -144,12 +144,12 @@ test('production start, independent device sessions, HTTPS checks, restart persi
     const backups=readdirSync(join(directory,'backups')).filter(f=>f.endsWith('.sqlite'));assert.equal(backups.length,1);
     const restored=openDatabase(resolve(directory,'backups',backups[0]));
     try {
-      assert.equal(restored.prepare('PRAGMA integrity_check').get().integrity_check,'ok');
-      assert.equal(restored.prepare('SELECT COUNT(*) n FROM evaluations').get().n,1);
-      assert.equal(restored.prepare('SELECT COUNT(*) n FROM responses').get().n,6);
-      assert.equal(restored.prepare('SELECT COUNT(*) n FROM users').get().n,2);
-      assert.equal(restored.prepare('SELECT COUNT(*) n FROM evaluations WHERE demo=1').get().n,0);
-    }finally{restored.close();}
+      assert.equal((await restored.prepare('PRAGMA integrity_check').get()).integrity_check,'ok');
+      assert.equal((await restored.prepare('SELECT COUNT(*) n FROM evaluations').get()).n,1);
+      assert.equal((await restored.prepare('SELECT COUNT(*) n FROM responses').get()).n,6);
+      assert.equal((await restored.prepare('SELECT COUNT(*) n FROM users').get()).n,2);
+      assert.equal((await restored.prepare('SELECT COUNT(*) n FROM evaluations WHERE demo=1').get()).n,0);
+    }finally{(await restored.close());}
   }finally{
     if(running)await stop(running.child);
     removeTestDirectory(directory);

@@ -1,11 +1,11 @@
 import { openDatabase,loadEnv,audit,ROOT } from '../server/db.mjs';
 import { mkdirSync } from 'node:fs';
 import { resolve,dirname } from 'node:path';
-loadEnv();const db=openDatabase();
+loadEnv();if(process.env.VOX_DATABASE==='supabase'||process.env.DATABASE_URL)throw Error('Este comando é exclusivo do SQLite local. Use as ferramentas de backup e gestão do Supabase.');const db=openDatabase();
 const databasePath=resolve(process.env.VOX_DB || resolve(ROOT,'data/vox.sqlite'));
 const directory=resolve(process.env.VOX_BACKUP_DIR || resolve(dirname(databasePath),'backups'));
 mkdirSync(directory,{recursive:true});
 const target=resolve(directory,`vox-${new Date().toISOString().replace(/[:.]/g,'-')}.sqlite`);
 db.prepare('VACUUM INTO ?').run(target);
-audit(db,null,'Backup local criado','system');db.close();
+await audit(db,null,'Backup local criado','system');db.close();
 console.log(`Backup consistente criado: ${target}`);

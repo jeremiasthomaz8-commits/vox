@@ -4,7 +4,7 @@
 
 O Vox está configurado para desenvolvimento em `127.0.0.1:3000`, com SQLite em `data/vox.sqlite`. As avaliações de teste foram removidas com backup. Cadastros e acessos foram preservados. A fotografia opcional está ativa localmente. O servidor local não deve ser exposto diretamente à internet.
 
-Para publicar o sistema completo com HTTPS a partir do GitHub, veja [Acesso pela internet](deployment.md). O template da Render usa disco persistente e provisiona um banco novo no primeiro início, a partir de senhas privadas do ambiente. Não copia o banco local.
+Para publicar o sistema completo com HTTPS a partir do GitHub, veja [Acesso pela internet](deployment.md). O template da Render usa PostgreSQL do Supabase e não precisa de disco persistente. O script de migração preserva os cadastros e hashes das senhas existentes; sessões precisam de novo login. Consulte o guia de implantação para a conexão privada e os backups do Supabase.
 
 ## Antes da implantação
 
@@ -21,7 +21,8 @@ Após a aprovação, o responsável técnico deve:
 NODE_ENV=production
 HOST=127.0.0.1
 PORT=3000
-VOX_DB=data/vox-production.sqlite
+VOX_DATABASE=supabase
+DATABASE_URL=CONEXAO_PRIVADA_DO_SESSION_POOLER
 LEGAL_REVIEW_APPROVED=true
 TRUST_PROXY=true
 PUBLIC_ORIGIN=https://ENDERECO-APROVADO-PELA-PREFEITURA
@@ -31,11 +32,13 @@ PUBLIC_ORIGIN=https://ENDERECO-APROVADO-PELA-PREFEITURA
 6. Verificar os dois perfis por HTTPS, acesso negado às APIs administrativas por usuário UBS, uma avaliação de ponta a ponta e exportação autorizada. Testar teclado, zoom, contraste, leitores de tela e os dispositivos de toque reais com os usuários do serviço.
 7. Cadastrar as unidades oficiais e criar um acesso por unidade. Os cadastros de demonstração não são uma fonte oficial de nomes ou CNES.
 
-O funcionamento em várias instâncias exige migração da persistência, sem compartilhar o arquivo SQLite em uma pasta de rede.
+A operação compartilhada usa Supabase. Nunca compartilhe um arquivo SQLite entre várias instâncias. Dimensione o pool conforme o limite de conexões do projeto.
 
 ## Backups e recuperação
 
-`npm run backup` executa `VACUUM INTO` e produz uma cópia consistente na pasta `backups` ao lado do banco ativo (`data/backups/` localmente e `/var/data/backups/` no template da Render). `VOX_BACKUP_DIR` permite escolher outro destino. Essa cópia é uma ferramenta, não uma política completa de backup.
+Para Supabase, use backups e exportações privadas do painel/CLI do provedor, conforme o plano contratado, e teste a recuperação. Preserve a chave fotográfica separadamente. O comando local recusa o modo Supabase para evitar copiar um banco inativo.
+
+**Somente SQLite local:** `npm run backup` executa `VACUUM INTO` e produz uma cópia consistente na pasta `backups` ao lado do banco ativo (`data/backups/` localmente). `VOX_BACKUP_DIR` permite escolher outro destino. Essa cópia é uma ferramenta, não uma política completa de backup.
 
 Defina com a infraestrutura a frequência, retenção, destino externo criptografado, alertas de falha e testes periódicos de restauração. Restrinja as permissões de banco, diretório, logs e backups à conta de serviço e aos administradores autorizados. Não envie o banco por e-mail nem o coloque em armazenamento público. Em produção, prefira disco local gerenciado fora de pastas de sincronização de arquivos.
 

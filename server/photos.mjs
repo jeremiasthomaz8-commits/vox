@@ -63,27 +63,28 @@ export function preparePhoto(input,enabled,retention) {
   result.authorization={consent:true,notice_version:PHOTO_NOTICE_VERSION,retention_days:result.days,received_at:new Date().toISOString()};
   return result;
 }
-export function storePhoto(db,evaluationId,photo,key) {
+export async function storePhoto(db,evaluationId,photo,key) {
   if(photo.status==='disabled')return;
   const id=randomUUID(),now=new Date().toISOString();let encrypted=null;
   if(photo.bytes){
     const iv=randomBytes(12),cipher=createCipheriv('aes-256-gcm',key,iv);cipher.setAAD(Buffer.from(evaluationId));
     const content=Buffer.concat([cipher.update(photo.bytes),cipher.final()]);encrypted=Buffer.concat([iv,cipher.getAuthTag(),content]);
   }
-  db.prepare('INSERT INTO photographic_evidence(id,evaluation_id,authorization_record,captured_at,status,encrypted_data,expires_at,content_hash) VALUES(?,?,?,?,?,?,?,?)').run(id,evaluationId,photo.authorization?JSON.stringify(photo.authorization):null,photo.bytes?now:null,photo.status,encrypted,photo.bytes?new Date(Date.now()+photo.days*86400000).toISOString():null,photo.bytes?hash(photo.bytes):null);
+  (await db.prepare('INSERT INTO photographic_evidence(id,evaluation_id,authorization_record,captured_at,status,encrypted_data,expires_at,content_hash) VALUES(?,?,?,?,?,?,?,?)').run(id,evaluationId,photo.authorization?JSON.stringify(photo.authorization):null,photo.bytes?now:null,photo.status,encrypted,photo.bytes?new Date(Date.now()+photo.days*86400000).toISOString():null,photo.bytes?hash(photo.bytes):null));
 }
 export function decryptPhoto(row,key) {
   const bytes=Buffer.from(row.encrypted_data),decipher=createDecipheriv('aes-256-gcm',key,bytes.subarray(0,12));
   decipher.setAuthTag(bytes.subarray(12,28));decipher.setAAD(Buffer.from(row.evaluation_id));
   return Buffer.concat([decipher.update(bytes.subarray(28)),decipher.final()]);
 }
-export function deletePhoto(db,row,actor=null,reason='manual') {
-  db.prepare("UPDATE photographic_evidence SET encrypted_data=NULL,content_hash=NULL,private_reference=NULL,status='deleted',deleted_at=? WHERE id=?").run(new Date().toISOString(),row.id);
-  db.prepare("UPDATE evaluations SET photo_status='deleted' WHERE id=?").run(row.evaluation_id);
-  audit(db,actor,'Fotografia excluída',row.id,{evaluation_id:row.evaluation_id,reason});
+export async function deletePhoto(db,row,actor=null,reason='manual') {
+  const changed=(await db.prepare("UPDATE photographic_evidence SET encrypted_data=NULL,content_hash=NULL,private_reference=NULL,status='deleted',deleted_at=? WHERE id=? AND status='captured'").run(new Date().toISOString(),row.id));
+  if(!changed.changes)return;
+  (await db.prepare("UPDATE evaluations SET photo_status='deleted' WHERE id=?").run(row.evaluation_id));
+  (await audit(db,actor,'Fotografia excluída',row.id,{evaluation_id:row.evaluation_id,reason}));
 }
-export function expirePhotos(db,now=new Date().toISOString()) {
-  const rows=db.prepare("SELECT id,evaluation_id FROM photographic_evidence WHERE status='captured' AND expires_at<=?").all(now);
-  if(rows.length)transaction(db,()=>{for(const row of rows)deletePhoto(db,row,null,'retention');});
+export async function expirePhotos(db,now=new Date().toISOString()) {
+  const rows=(await db.prepare("SELECT id,evaluation_id FROM photographic_evidence WHERE status='captured' AND expires_at<=?").all(now));
+  if(rows.length)(await transaction(db,async ()=>{for(const row of rows)(await deletePhoto(db,row,null,'retention'));}));
   return rows.length;
 }

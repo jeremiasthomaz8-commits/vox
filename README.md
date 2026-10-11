@@ -12,9 +12,10 @@ O repositório está preparado para hospedar o sistema completo com HTTPS, login
 
 ## Executar localmente
 
-Requisito: **Node.js 24.21 ou superior da série 24.x**. Não há dependências de execução para instalar, serviços externos ou chaves de API.
+Requisito: **Node.js 24.21 ou superior da série 24.x**. Execute `npm ci` para instalar as dependências. O modo local SQLite funciona sem serviços externos; o modo Supabase usa a conexão privada do servidor.
 
 ```powershell
+npm ci
 npm start
 ```
 
@@ -67,6 +68,7 @@ A retenção padrão é de 30 dias, configurável. O servidor exclui fotos venci
 ```powershell
 npm run check
 npm test
+npm run test:postgres
 npm run backup
 ```
 
@@ -85,12 +87,13 @@ Os testes visuais opcionais `node tests/ui-smoke.mjs` e `node tests/ui-photos.mj
 | `server/alerts.mjs` | Regras de detecção explicáveis |
 | `server/reports.mjs` | Exportações autorizadas CSV/PDF |
 | `server/photos.mjs` | Consentimento, criptografia, chave privada e retenção de fotos |
+| `supabase/` | Migração PostgreSQL, permissões do servidor e certificado público da CA |
 | `migrations/` | Esquema relacional, índices e restrições |
 | `scripts/` | Provisionamento, verificação e backup |
 | `tests/` | Testes de integração e navegação |
 | `data/` | SQLite e backups locais, ignorados pelo Git |
 
-O stack usa os módulos nativos do Node.js e SQLite, adequado a um MVP de processo único. A interface usa módulos JavaScript e componentes de renderização reutilizáveis; não depende de React nem de conexão externa para carregar. Para operação distribuída ou escala maior, migre o adaptador de persistência para PostgreSQL mantendo as regras no servidor. Veja [arquitetura e segurança](docs/architecture.md).
+O servidor Node.js usa PostgreSQL do Supabase para a operação online, através do driver `pg` com TLS verificado, pool de conexões e transações assíncronas. SQLite continua disponível para desenvolvimento local. As tabelas privadas ficam no schema `vox`, acessível somente pelo servidor. A interface mantém JavaScript, CSS e fontes locais. Veja [arquitetura e segurança](docs/architecture.md).
 
 ## Produção
 

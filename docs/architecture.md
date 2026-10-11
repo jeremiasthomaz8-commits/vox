@@ -2,9 +2,9 @@
 
 ## Runtime and trust boundaries
 
-Node.js 24 serves the frontend and same-origin API. SQLite WAL provides persistent, relational storage with foreign keys, checks and transaction boundaries. No browser storage is used for evaluation records, credentials or sessions. Temporary kiosk answers exist only in memory.
+Node.js 24 serves the frontend and same-origin API. Supabase PostgreSQL provides shared relational storage, foreign keys, checks and asynchronous transactions. SQLite WAL remains an explicit local development option. No browser storage is used for evaluation records, credentials or sessions. Temporary kiosk answers exist only in memory.
 
-The application is a single process intended for a bounded local MVP. SQLite and synchronous scrypt limit throughput. Do not horizontally scale this process against a shared filesystem database. Move persistence to a managed PostgreSQL service and use an asynchronous password worker/pool when operational load requires it. Durable application state is isolated from static files.
+The server connects through the Supabase IPv4 session pooler using `pg`, at most five connections per process and TLS certificate/hostname verification. The private `vox` schema is not exposed through the Data API. RLS denies browser roles; a restricted `vox_app` role has policies and table grants only for server operations. This role cannot create objects, modify categories or schema versions, or alter/delete audit rows. Durable application state is isolated from static files. Synchronous scrypt still limits login throughput; capacity testing is required before scaling.
 
 The session joins the current user and current unit on **every request**. Deactivating either takes effect immediately. All administrative paths share an explicit administrator guard before any operation. Every evaluation uses `session.unit_id` and the unit's server-side device ID, ignoring a client unit ID. Unit accounts can only read their own session context and submit new ratings; they cannot list historical records or photos.
 
@@ -22,8 +22,8 @@ Authenticated mutations require the session's CSRF token. Cross-origin POST/PATC
 
 1. Authenticate the unit and verify its current active status.
 2. Validate exactly six integer ratings between 1 and 5.
-3. Check a unique idempotency key and the payload digest. Reuse with a different payload or unit is rejected.
-4. Commit evaluation, six response rows and audit event in one `BEGIN IMMEDIATE` transaction.
+3. Within the transaction, lock the unit and key with PostgreSQL advisory locks (SQLite uses its writer mutex). Check a unique idempotency key and the payload digest. Reuse with a different payload or unit is rejected.
+4. Commit evaluation, six response rows and audit event in one transaction on the same database connection.
 5. Detect operational alerts. A detection failure never discards committed ratings.
 6. Confirm success only after commit. The client retains the same key on retry.
 
@@ -47,7 +47,7 @@ Rules inspect the latest 30 days, two seven-day windows, or a ten-minute window.
 
 Review status, notes and every resolution event are persisted transactionally. Alerts are investigation prompts; repeated patterns or high scores are not proof of misconduct. Threshold changes do not change the scoring formula or historical ratings.
 
-Audit records reject UPDATE and DELETE through SQLite triggers. This prevents normal application modification, but does not protect against a database owner changing the schema or filesystem. Production requires protected host access and a separate append-only external log sink for stronger tamper evidence.
+Audit records reject UPDATE and DELETE through PostgreSQL/SQLite triggers and restricted PostgreSQL grants. This prevents normal application modification, but does not protect against a database owner changing the schema or filesystem. Production requires protected host access and a separate append-only external log sink for stronger tamper evidence.
 
 ## Reports and operational limits
 

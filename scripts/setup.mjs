@@ -1,14 +1,14 @@
 import readline from 'node:readline/promises';
 import { randomUUID } from 'node:crypto';
-import { openDatabase,loadEnv,transaction,audit } from '../server/db.mjs';
+import { connectDatabase,loadEnv,transaction,audit } from '../server/db.mjs';
 import { hashPassword,digest } from '../server/auth.mjs';
 import { localDay,shiftDay,midnight } from '../server/analytics.mjs';
 import { detectAlerts } from '../server/alerts.mjs';
 
 loadEnv();
 if(process.env.NODE_ENV==='production'&&process.argv.includes('--demo'))throw Error('Demonstration seed is not allowed in production.');
-const db=openDatabase();
-if(db.prepare('SELECT 1 FROM users LIMIT 1').get()){console.log('Vox já foi configurado. Nenhuma conta ou avaliação foi recriada.');db.close();process.exit(0);}
+const db=await connectDatabase();
+if((await db.prepare('SELECT 1 FROM users LIMIT 1').get())){console.log('Vox já foi configurado. Nenhuma conta ou avaliação foi recriada.');(await db.close());process.exit(0);}
 let config;
 if(process.argv.includes('--stdin')) {
   if(process.stdin.isTTY)process.stdin.setRawMode(true);
@@ -26,11 +26,11 @@ for(const k of ['admin','unit'])if(!/^[a-zA-Z][a-zA-Z0-9]{2,59}$/.test(config[k]
 for(const k of ['adminPassword','unitPassword'])if(typeof config[k]!=='string'||config[k].length<10||config[k].length>128)throw Error('Passwords must have 10 to 128 characters');
 const now=new Date().toISOString(),unitId=randomUUID(),adminId=randomUUID(),unitUserId=randomUUID(),demo=process.argv.includes('--demo');
 const adminHash=hashPassword(config.adminPassword),unitHash=hashPassword(config.unitPassword);
-transaction(db,()=>{
-  db.prepare('INSERT INTO units(id,name,device_id,created_at,updated_at) VALUES(?,?,?,?,?)').run(unitId,'UBS Monterrey','VOX-'+randomUUID().slice(0,8).toUpperCase(),now,now);
-  db.prepare('INSERT INTO users(id,username,password_hash,role,unit_id,created_at,updated_at) VALUES(?,?,?,\'admin\',NULL,?,?)').run(adminId,config.admin,adminHash,now,now);
-  db.prepare('INSERT INTO users(id,username,password_hash,role,unit_id,created_at,updated_at) VALUES(?,?,?,\'unit\',?,?,?)').run(unitUserId,config.unit,unitHash,unitId,now,now);
-  audit(db,null,'Configuração inicial','system',{demo});
+(await transaction(db,async ()=>{
+  (await db.prepare('INSERT INTO units(id,name,device_id,created_at,updated_at) VALUES(?,?,?,?,?)').run(unitId,'UBS Monterrey','VOX-'+randomUUID().slice(0,8).toUpperCase(),now,now));
+  (await db.prepare('INSERT INTO users(id,username,password_hash,role,unit_id,created_at,updated_at) VALUES(?,?,?,\'admin\',NULL,?,?)').run(adminId,config.admin,adminHash,now,now));
+  (await db.prepare('INSERT INTO users(id,username,password_hash,role,unit_id,created_at,updated_at) VALUES(?,?,?,\'unit\',?,?,?)').run(unitUserId,config.unit,unitHash,unitId,now,now));
+  (await audit(db,null,'Configuração inicial','system',{demo}));
   if(demo) {
     const units=[
       [unitId,'UBS Monterrey',[4.6,4.7,4.4,4.5,4.1,4.7],8],
@@ -42,7 +42,7 @@ transaction(db,()=>{
     ];
     let state=48271;const rand=()=>{state=state*16807%2147483647;return (state-1)/2147483646;};
     for(const [id,name,means,frequency]of units) {
-      if(id!==unitId)db.prepare('INSERT INTO units(id,name,device_id,demo,created_at,updated_at) VALUES(?,?,?,1,?,?)').run(id,name,'DEMO-'+id.slice(0,8).toUpperCase(),now,now);
+      if(id!==unitId)(await db.prepare('INSERT INTO units(id,name,device_id,demo,created_at,updated_at) VALUES(?,?,?,1,?,?)').run(id,name,'DEMO-'+id.slice(0,8).toUpperCase(),now,now));
       for(let ago=89;ago>=0;ago--) {
         const day=shiftDay(localDay(),-ago),weekday=new Date(day+'T12:00:00Z').getUTCDay();
         const count=Math.max(0,Math.floor(frequency*(weekday===0?0.15:weekday===6?0.4:1)+(rand()-0.5)*4));
@@ -51,14 +51,14 @@ transaction(db,()=>{
           if(created.getTime()>Date.now())continue;
           const eid=randomUUID(),key=randomUUID();
           const ratings=means.map(mean=>{const val=mean-ago/180+(rand()-0.5)*1.8;return Math.max(1,Math.min(5,Math.floor(val)+(rand()<(val%1)?1:0)));});
-          db.prepare('INSERT INTO evaluations(id,unit_id,created_at,device_id,idempotency_key,payload_hash,demo) VALUES(?,?,?,?,?,?,1)').run(eid,id,created.toISOString(),'DEMO-'+id.slice(0,8).toUpperCase(),key,digest(JSON.stringify(ratings)));
-          for(const [i,rating]of ratings.entries())db.prepare('INSERT INTO responses VALUES(?,?,?)').run(eid,i+1,rating);
+          (await db.prepare('INSERT INTO evaluations(id,unit_id,created_at,device_id,idempotency_key,payload_hash,demo) VALUES(?,?,?,?,?,?,1)').run(eid,id,created.toISOString(),'DEMO-'+id.slice(0,8).toUpperCase(),key,digest(JSON.stringify(ratings))));
+          for(const [i,rating]of ratings.entries())(await db.prepare('INSERT INTO responses VALUES(?,?,?)').run(eid,i+1,rating));
         }
       }
     }
-    audit(db,adminId,'Demonstração carregada','system',{units:6});
+    (await audit(db,adminId,'Demonstração carregada','system',{units:6}));
   }
-});
-detectAlerts(db);config=null;
+}));
+(await detectAlerts(db));config=null;
 console.log(`Vox configurado. ${demo?'Dados fictícios de demonstração identificados foram adicionados.':'Banco pronto, sem avaliações fictícias.'} As senhas provisórias devem ser alteradas antes do uso em produção.`);
-db.close();process.stdin.destroy();
+(await db.close());process.stdin.destroy();

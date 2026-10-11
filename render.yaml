@@ -9,22 +9,18 @@ services:
     region: virginia
     numInstances: 1
     autoDeployTrigger: "off"
-    buildCommand: npm run check
+    buildCommand: npm ci --omit=dev && npm run check
     startCommand: npm start
     healthCheckPath: /api/health
-    disk:
-      name: vox-data
-      mountPath: /var/data
-      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
       - key: HOST
         value: 0.0.0.0
-      - key: SKIP_INSTALL_DEPS
-        value: "true"
-      - key: VOX_DB
-        value: /var/data/vox.sqlite
+      - key: VOX_DATABASE
+        value: supabase
+      - key: DATABASE_URL
+        sync: false
       - key: TRUST_PROXY
         value: "true"
       # PUBLIC_ORIGIN defaults to Render's generated HTTPS URL.
@@ -44,4 +40,4 @@ services:
       - key: PHOTO_PRIVACY_APPROVED
         sync: false
       - key: PHOTO_ENCRYPTION_KEY
-        generateValue: true
+        sync: false

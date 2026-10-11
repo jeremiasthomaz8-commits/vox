@@ -1,41 +1,60 @@
-# Acesso pela internet
+# Acesso pela internet com Supabase
 
-O GitHub guarda o código. O Vox precisa também de um servidor Node.js e de um disco persistente, pois autenticação, avaliações e fotografias são processadas no servidor. GitHub Pages não executa esse servidor. Depois da implantação, todos os dispositivos usam o mesmo link HTTPS e compartilham o banco, com sessões de login independentes.
+O GitHub guarda o código. A Render executa o servidor Node.js com HTTPS e o Supabase guarda os dados compartilhados. Todos os dispositivos usam a URL HTTPS da aplicação, com sessões independentes. O banco e as fotografias criptografadas ficam no PostgreSQL; não é necessário disco persistente na Render.
 
-## Publicar na Render
+## Preparar o projeto Supabase existente
+
+1. Aplique `supabase/migrations/202610110001_vox.sql` no SQL Editor ou por migração autenticada. O script cria somente o schema privado `vox`; não altera `public`, `auth` ou outros schemas. Execute uma vez.
+2. Aplique `supabase/vox-app-role.sql`. Configure uma senha aleatória para o usuário de banco `vox_app` por um canal privado. Guarde a conexão somente no servidor. Esse usuário não é a conta do diretor; é uma credencial de infraestrutura com permissões restritas.
+3. No painel **Connect → Direct → Session pooler**, copie o host real do projeto. Use a porta 5432 e o usuário `vox_app.PROJECT_REF`. Não deduza o host apenas pela região. Exemplo sem segredo:
+
+```dotenv
+VOX_DATABASE=supabase
+DATABASE_URL=postgresql://vox_app.PROJECT_REF:SENHA_PRIVADA@HOST_DO_SESSION_POOLER:5432/postgres
+```
+
+O driver `pg` verifica a cadeia TLS e o nome do servidor. O certificado público oficial em `supabase/certs/prod-ca-2021.crt` foi obtido do download indicado pelo painel Supabase, com SHA-256 `807025ad50d4ed219d2c9c7d299c004f824eb00cf7f65afef607d07b72e6cafa`, válido até abril de 2031. `DATABASE_CA_CERT` permite substituir a CA por PEM, inclusive com separadores literais `\n`. Atualize a CA conforme orientação do provedor; não desative a verificação TLS.
+
+As tabelas têm RLS. `anon`, `authenticated` e `PUBLIC` não têm acesso ao schema. O navegador conversa com a API autenticada do Vox; não recebe a conexão PostgreSQL. Não adicione `vox` aos schemas expostos pela Data API.
+
+## Migrar o banco local
+
+Pare o servidor local durante a transferência para evitar novos envios no banco antigo. Preserve a chave fotográfica original em `PHOTO_ENCRYPTION_KEY` caso existam imagens. Configure a conexão privada e execute:
+
+```powershell
+node --env-file=.env.supabase scripts/migrate-supabase.mjs
+```
+
+O script faz um backup consistente antes da importação e exige tabelas Vox vazias. Transfere unidades, contas com os mesmos hashes de senha, avaliações, respostas, fotos criptografadas, alertas, histórico, configurações e auditoria em uma transação. Confere contagens e recusa avaliações de demonstração. Sessões e tentativas de login não são transferidas; entre novamente. O SQLite original é preservado. O destino preenchido nunca é sobrescrito.
+
+## Publicar o servidor na Render
 
 [Publicar o Vox na Render](https://render.com/deploy?repo=https://github.com/jeremiasthomaz8-commits/vox)
 
-O arquivo `render.yaml` prepara um serviço Node.js 24.21.0 com uma instância, certificado HTTPS, monitoramento em `/api/health` e disco de 1 GB montado em `/var/data`. O banco fica em `/var/data/vox.sqlite`. A Render disponibiliza o disco no início do processo; por isso o provisionamento ocorre no primeiro início, nunca durante o build.
+O `render.yaml` configura Node.js 24, build `npm ci --omit=dev && npm run check`, início `npm start`, saúde `/api/health` e uma instância em Virginia, próxima ao Supabase deste projeto. O plano `0.5c-512mb` tem base de US$ 7/mês conforme a tabela consultada em 10/10/2026; não há cobrança de disco neste template. Os custos do Supabase seguem o plano do projeto existente. Revise os valores no painel do provedor.
 
-**Há cobrança:** o plano `0.5c-512mb` custa US$ 7/mês e o disco de 1 GB custa US$ 0,25/mês, conforme a tabela consultada em 10/10/2026. A base é US$ 7,25/mês, sujeita a câmbio, tributos, uso excedente e outros recursos da conta. Revise os valores mostrados pela Render antes de criar o serviço. O plano gratuito não oferece o disco persistente necessário a esta configuração.
+Configure as variáveis privadas no painel da Render:
 
-1. Abra o link, entre na Render e escolha a conta e o workspace responsáveis pelo Vox. Revise os recursos e a cobrança.
-2. Preencha as variáveis solicitadas no painel, sem colocá-las no GitHub:
-
-| Variável | Valor / finalidade |
+| Variável | Finalidade |
 | --- | --- |
-| `VOX_ADMIN_PASSWORD` | Senha inicial privada da direção, com 10 a 128 caracteres |
-| `VOX_UNIT_PASSWORD` | Senha inicial privada da UBS Monterrey, com 10 a 128 caracteres |
-| `LEGAL_REVIEW_APPROVED` | `true` somente após a revisão municipal já exigida pela especificação |
-| `PHOTO_PRIVACY_APPROVED` | `true` somente após aprovação específica da política fotográfica |
+| `DATABASE_URL` | Conexão privada do usuário `vox_app` pelo session pooler |
+| `PHOTO_ENCRYPTION_KEY` | Chave original de 32 bytes em base64; preserve fora do banco |
+| `LEGAL_REVIEW_APPROVED` | `true` após a revisão municipal |
+| `PHOTO_PRIVACY_APPROVED` | `true` após a aprovação da política fotográfica |
+| `VOX_ADMIN_PASSWORD`, `VOX_UNIT_PASSWORD` | Somente para provisionar um banco sem contas; desnecessárias após migração |
 
-Os usuários iniciais são `admregulacaodiretor` e `UBSMonterrey`. A chave `PHOTO_ENCRYPTION_KEY` é gerada pela Render, com 32 bytes aleatórios em base64. Preserve essa chave no gerenciador de segredos: recriá-la torna as fotos existentes ilegíveis. Se as fotos ainda não forem aprovadas, altere `PHOTO_CAPTURE_ENABLED` para `false` antes do primeiro início; as notas funcionam sem câmera.
+Não gere outra chave se já houver fotos. Chaves diferentes tornam imagens existentes ilegíveis. As aprovações para este projeto foram confirmadas pelo responsável; mantenha o registro municipal correspondente.
 
-3. Confirme a criação após revisar as configurações. Aguarde o build e o status **Live**. O build verifica a sintaxe; o início aplica as migrações e cria os acessos apenas se o banco estiver vazio. Nenhuma avaliação de teste é adicionada. Reinícios e novas implantações preservam as contas, as senhas alteradas e as avaliações.
-4. Copie a URL HTTPS mostrada no serviço (terminada em `.onrender.com`). Esse é o link para abrir em Chrome, Edge, Safari ou outro navegador no computador, tablet e celular. O endereço do repositório e `127.0.0.1` não são o link público do sistema.
-5. Entre em cada perfil e altere a senha provisória. Cadastre as unidades oficiais pela direção. Valide uma avaliação completa e, com a política aprovada, a câmera nos dispositivos reais. O navegador continua exigindo sua própria permissão de câmera. Fotografias são opcionais para o paciente.
+Após o estado **Live**, use a URL HTTPS `.onrender.com` em computadores, tablets ou celulares. O repositório e `127.0.0.1` não são o endereço público. Valide os perfis da direção e da unidade. O navegador exige sua própria permissão de câmera e fotografias permanecem opcionais para o paciente.
 
-A implantação começa com **um banco novo**. O banco, as fotos, os backups e as credenciais locais não são enviados pelo repositório. Uma migração do banco local deve ser uma operação separada, com transferência privada e recuperação da chave original, conforme [operação](operations.md).
+O modo `supabase` recusa iniciar sem conexão ou migração; nunca cria um SQLite de substituição. Reinícios usam o mesmo banco remoto. O template desativa implantação automática; após testes e push, use **Manual Deploy → Deploy latest commit**. Se utilizar o plano gratuito, considere as suspensões por inatividade e limites documentados pela Render e pelo Supabase antes da operação com pacientes.
 
-## Atualizações e domínio
+## Verificação, recuperação e domínio
 
-O template desativa implantação automática. Depois de testar e enviar alterações ao GitHub, use **Manual Deploy → Deploy latest commit** no serviço. O disco permanece montado. Não troque para o plano gratuito nem remova o disco. Este SQLite funciona com uma única instância; não ative réplicas compartilhando o mesmo arquivo.
+Execute `npm test` e `npm run test:postgres` antes das atualizações. Os testes PostgreSQL usam PGlite isolado com o papel restrito do servidor, sem avaliações fictícias no projeto real. Incluem transações, fotos, permissões, migração e reenvios simultâneos. Faça também a verificação da conexão TLS com o Supabase real.
 
-O servidor adota automaticamente `RENDER_EXTERNAL_URL` como origem HTTPS. Ao configurar um domínio próprio na Render, defina também `PUBLIC_ORIGIN=https://seu-dominio` e passe a acessar exclusivamente esse domínio. A validação de Host e a proteção de origem continuam ativas para login, páginas e APIs. A rota de saúde é pública e revela apenas o estado do serviço.
+Use backups/exportações privados do Supabase conforme o plano, com retenção definida e restauração testada. A chave das fotos deve ser recuperável separadamente. `npm run backup` é exclusivo do SQLite local e recusa o modo Supabase. A exclusão de uma foto no sistema não remove cópias anteriores dos backups; sua retenção segue a política operacional. Monitore capacidade do banco, especialmente o volume de imagens.
 
-## Backup
+O servidor adota `RENDER_EXTERNAL_URL` como origem HTTPS. Para domínio próprio, defina `PUBLIC_ORIGIN=https://seu-dominio` e use esse domínio. A validação de Host, HTTPS e origem continua ativa.
 
-Execute `npm run backup` no Shell do serviço. A cópia consistente será criada em `/var/data/backups`, junto ao banco persistente, ou no diretório definido por `VOX_BACKUP_DIR`. Copie-a para armazenamento externo privado conforme a política operacional: uma cópia no mesmo disco não protege contra a perda do disco. Preserve também a chave de criptografia em seu gerenciador de segredos e teste a restauração. Monitore o espaço livre, especialmente ao habilitar fotos e manter backups.
-
-Referências: [Blueprints](https://render.com/docs/blueprint-spec), [discos persistentes](https://render.com/docs/disks), [variáveis do ambiente](https://render.com/docs/environment-variables), [preços](https://render.com/pricing) e [Deploy to Render](https://render.com/docs/deploy-to-render).
+Referências: [conexões Supabase](https://supabase.com/docs/guides/database/connecting-to-postgres), [TLS Supabase](https://supabase.com/docs/guides/platform/ssl-enforcement), [Blueprints Render](https://render.com/docs/blueprint-spec) e [preços Render](https://render.com/pricing).
