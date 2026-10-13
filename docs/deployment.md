@@ -2,6 +2,8 @@
 
 O GitHub guarda o código, a Netlify Free publica a interface e executa a API Node.js, e o Supabase Free guarda os dados compartilhados. Todos os dispositivos usam o mesmo endereço HTTPS, com sessões independentes. Avaliações, contas, auditoria e fotografias criptografadas permanecem no PostgreSQL privado. Não é necessário contratar servidor nem disco na Render.
 
+O Vox deste repositório foi publicado em **[https://vox-louveira.netlify.app/](https://vox-louveira.netlify.app/)** em 13/10/2026, na equipe `jeremiasthomaz8`, plano Free. As variáveis privadas estão restritas ao contexto de produção. O deploy foi feito pela CLI, a partir do código do GitHub; novos pushes no repositório não atualizam automaticamente esta instalação.
+
 ## Plano gratuito e limites
 
 Escolha **Free** na Netlify e mantenha o projeto Supabase no plano **Free**. Não selecione testes de planos pagos, upgrades, complementos ou recarga de créditos. Os preços consultados em 11/10/2026 indicam US$ 0 para ambos os planos. A Netlify Free oferece 300 créditos por mês com limite rígido: ao atingir o limite, os projetos da conta pausam até o próximo ciclo, sem cobrança automática de excedentes. Publicações, tráfego e execução das funções consomem esses créditos. Consulte o painel de uso antes de publicar novas versões.
@@ -64,6 +66,15 @@ npm run test:postgres
 Os testes usam SQLite ou PostgreSQL PGlite isolados, sem inserir avaliações fictícias no projeto Supabase em uso. Incluem o adaptador de funções, login/logout, cookies, CSRF, origem HTTPS, captura opcional, criptografia, acesso do diretor, bytes de fotos e PDF, exportação CSV e reenvios idempotentes.
 
 Depois da publicação, verifique `/api/health`, a tela de login e os dois perfis com os acessos atuais. Confira **Usage & billing** para manter o plano Free. Uma publicação de produção consome créditos: evite implantações repetidas sem necessidade e restrinja builds automáticos conforme o uso da equipe.
+
+Para atualizar a instalação publicada, faça login pela CLI oficial, confira a versão do repositório e execute o deploy com build completo:
+
+```powershell
+npm exec --yes --package=netlify-cli -- netlify login
+npm exec --yes --package=netlify-cli -- netlify deploy --prod --context production --site 81dd602d-aaa7-47eb-a5f4-5e75eaef457a
+```
+
+O comando usa `netlify.toml` para publicar `public` e empacotar as funções de `netlify/functions`. Não use `.netlify/functions` como diretório de origem no upload: essa pasta é o cache gerado pelo build. Verifique que `/api/health` responde JSON com status 200 e que `/api/me` responde 401 sem sessão. Mantenha previews privados e as credenciais somente em produção.
 
 ## Backup e migração local
 

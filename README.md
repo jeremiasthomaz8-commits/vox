@@ -6,9 +6,9 @@ O repositório contém apenas o código, as fontes e a documentação. Banco de 
 
 ## Acessar pela internet
 
-[Publicar o Vox na Netlify Free](https://app.netlify.com/)
+[Acessar o Vox publicado](https://vox-louveira.netlify.app/)
 
-O projeto está preparado para **Netlify Free + Supabase Free**, com HTTPS, login e banco compartilhado, sem mensalidade. Importe este repositório na Netlify e configure as variáveis privadas conforme o [guia de implantação](docs/deployment.md). Depois da publicação, abra a URL HTTPS `.netlify.app` em qualquer dispositivo. Na Netlify, atingir a cota mensal gratuita pausa o site, sem cobrança automática de excedentes. O GitHub guarda o código; o endereço público depende de concluir a implantação.
+O Vox está publicado em **https://vox-louveira.netlify.app/**, usando **Netlify Free + Supabase Free**, com HTTPS, login e banco compartilhado. Abra o endereço em qualquer navegador, computador, tablet ou celular e use seus acessos atuais. Na Netlify, atingir a cota mensal gratuita pausa o site, sem cobrança automática de excedentes. O GitHub guarda o código; as atualizações da hospedagem seguem o [guia de implantação](docs/deployment.md).
 
 ## Executar localmente
 
