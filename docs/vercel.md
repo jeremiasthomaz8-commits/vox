@@ -8,6 +8,8 @@ A Vercel restringe o plano Hobby gratuito a uso pessoal e não comercial. O resp
 
 Consulte as [condições de uso da Vercel](https://vercel.com/docs/limits/fair-use-guidelines). Havendo dúvida de elegibilidade, a própria Vercel orienta consultar seu suporte.
 
+A publicação automática a partir do GitHub está desativada por `git.deploymentEnabled: false`. Isso permite atualizar o código sem iniciar uma nova implantação na conta Hobby. Depois de obter autorização ou um plano compatível, altere essa opção para `true` se quiser publicar automaticamente a cada atualização. A configuração não interfere na hospedagem atual da Netlify.
+
 ## Configuração da implantação
 
 Quando a hospedagem estiver autorizada:
@@ -34,7 +36,7 @@ Preserve a chave original das fotografias. Os dois endereços podem usar o mesmo
 
 `api/vox.mjs` usa a assinatura moderna `fetch(Request) → Response`. O adaptador mantém as verificações de Host/origem, HTTPS, CSRF, perfil de acesso, idempotência e limites de envio. O IP vem dos cabeçalhos fornecidos pela plataforma. A conexão com o Supabase verifica TLS e usa um pool pequeno apropriado a funções temporárias.
 
-As fontes Sora dos PDFs e a CA pública do Supabase são incluídas no pacote das funções. `.vercelignore` e `excludeFiles` protegem arquivos locais de dados, credenciais, backups e saídas de testes. `public: false` no arquivo Vercel mantém código e logs de implantação privados; essa opção não substitui o login da aplicação.
+As fontes Sora dos PDFs e a CA pública do Supabase são incluídas no pacote das funções. `.vercelignore` e `excludeFiles` protegem arquivos locais de dados, credenciais, backups e saídas de testes. A opção `public` foi removida porque a Vercel deixou de aceitá-la no `vercel.json`; código e logs de implantação permanecem protegidos por autenticação na plataforma. Essa proteção não substitui o login da aplicação.
 
 ## Retenção de fotos
 
@@ -54,4 +56,4 @@ Os testes usam bancos isolados SQLite e PostgreSQL PGlite. Cobrem os adaptadores
 
 Após publicar, `/api/health` deve retornar JSON com status HTTP 200 e `/api/me` deve retornar 401 sem sessão. Fotos e relatórios exigem login de diretor. A tela deve carregar a fonte Sora e a câmera depende da permissão do navegador e da escolha do paciente.
 
-Referências: [Node.js na Vercel](https://vercel.com/docs/functions/runtimes/node-js), [configuração Vercel](https://vercel.com/docs/project-configuration/vercel-json), [cron jobs](https://vercel.com/docs/cron-jobs/usage-and-pricing) e [proteção do agendamento](https://vercel.com/docs/cron-jobs/manage-cron-jobs).
+Referências: [Node.js na Vercel](https://vercel.com/docs/functions/runtimes/node-js), [configuração Vercel](https://vercel.com/docs/project-configuration/vercel-json), [publicação automática pelo Git](https://vercel.com/docs/project-configuration/git-configuration), [cron jobs](https://vercel.com/docs/cron-jobs/usage-and-pricing) e [proteção do agendamento](https://vercel.com/docs/cron-jobs/manage-cron-jobs).

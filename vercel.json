@@ -5,7 +5,7 @@
   "buildCommand": "npm run check",
   "outputDirectory": "public",
   "regions": ["iad1"],
-  "public": false,
+  "git": { "deploymentEnabled": false },
   "functions": {
     "api/*.mjs": {
       "maxDuration": 60,
