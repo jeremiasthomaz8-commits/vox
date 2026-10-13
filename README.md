@@ -10,6 +10,8 @@ O repositório contém apenas o código, as fontes e a documentação. Banco de 
 
 O Vox está publicado em **https://vox-louveira.netlify.app/**, usando **Netlify Free + Supabase Free**, com HTTPS, login e banco compartilhado. Abra o endereço em qualquer navegador, computador, tablet ou celular e use seus acessos atuais. Na Netlify, atingir a cota mensal gratuita pausa o site, sem cobrança automática de excedentes. O GitHub guarda o código; as atualizações da hospedagem seguem o [guia de implantação](docs/deployment.md).
 
+O código também suporta Vercel Functions com Node.js 24. Veja a [configuração para Vercel](docs/vercel.md). A publicação oficial permanece na Netlify Free: o Hobby gratuito da Vercel é restrito a uso pessoal e não comercial.
+
 ## Executar localmente
 
 Requisito: **Node.js 24.21 ou superior da série 24.x**. Execute `npm ci` para instalar as dependências. O modo local SQLite funciona sem serviços externos; o modo Supabase usa a conexão privada do servidor.

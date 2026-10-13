@@ -18,6 +18,7 @@
     "migrate:supabase": "node scripts/migrate-supabase.mjs"
   },
   "dependencies": {
+    "@vercel/functions": "3.9.11",
     "pg": "^8.23.1",
     "serverless-http": "3.2.0"
   },

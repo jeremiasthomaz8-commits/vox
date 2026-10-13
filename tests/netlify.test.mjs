@@ -4,19 +4,22 @@ import { randomUUID,randomBytes } from 'node:crypto';
 import { fixtureDatabase } from './database-fixture.mjs';
 import { hashPassword,digest } from '../server/auth.mjs';
 import { createNetlifyHandler } from '../server/netlify.mjs';
+import { createVercelHandler } from '../server/vercel.mjs';
 import { PHOTO_NOTICE_VERSION } from '../server/photos.mjs';
 
 const env={VOX_DATABASE:'supabase',NETLIFY:'true',URL:'https://vox.example.test',TRUST_PROXY:'true',LEGAL_REVIEW_APPROVED:'true',PHOTO_CAPTURE_ENABLED:'true',PHOTO_PRIVACY_APPROVED:'true'};
 const jpeg=Buffer.from('/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAX/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=','base64');
 
-test('modern Netlify adapter preserves logins, CSRF, idempotency, protected photo bytes, reports and logout',async()=>{
+for(const [platform,createHandler]of [['Netlify',createNetlifyHandler],['Vercel',createVercelHandler]]) {
+const deploymentEnv=platform==='Vercel'?{...env,NETLIFY:'false',VERCEL_ENV:'production',PUBLIC_ORIGIN:env.URL}:env;
+test(`${platform} adapter preserves logins, CSRF, idempotency, protected photo bytes, reports and logout`,async()=>{
   const db=await fixtureDatabase(),unitId=randomUUID(),password='Netlify-'+randomUUID(),now=new Date().toISOString();
   await db.prepare('INSERT INTO units(id,name,device_id,created_at,updated_at) VALUES(?,?,?,?,?)').run(unitId,'UBS Teste','NETLIFY-TEST',now,now);
   for(const role of ['admin','unit'])await db.prepare('INSERT INTO users(id,username,password_hash,role,unit_id,created_at,updated_at,must_change) VALUES(?,?,?,?,?,?,?,0)').run(randomUUID(),'Netlify'+role,hashPassword(password),role,role==='unit'?unitId:null,now,now);
   let connections=0;
-  const handler=createNetlifyHandler({env,photoKey:randomBytes(32),connect:async config=>{assert.equal(config.NODE_ENV,'production');connections++;return db;}});
+  const handler=createHandler({env:deploymentEnv,photoKey:randomBytes(32),connect:async config=>{assert.equal(config.NODE_ENV,'production');connections++;return db;}});
   async function req(path,{as,method='GET',data,headers={},origin=env.URL}={}){
-    return handler(new Request(origin+path,{method,headers:{...as?{cookie:as.cookie,'x-csrf-token':as.csrf}:{},...data?{'content-type':'application/json'}:{},...headers},...data?{body:JSON.stringify(data)}:{}}),{ip:'192.0.2.10',site:{url:env.URL}});
+    return handler(new Request(origin+path,{method,headers:{'x-vercel-forwarded-for':'192.0.2.10',...as?{cookie:as.cookie,'x-csrf-token':as.csrf}:{},...data?{'content-type':'application/json'}:{},...headers},...data?{body:JSON.stringify(data)}:{}}),{ip:'192.0.2.10',site:{url:env.URL}});
   }
   async function auth(role){
     const login=await req('/api/auth/login',{method:'POST',data:{username:'Netlify'+role,password}});
@@ -53,17 +56,18 @@ test('modern Netlify adapter preserves logins, CSRF, idempotency, protected phot
   }finally{await handler.close();}
 });
 
-test('failed cold starts retry, redact infrastructure errors and reject SQLite fallback',async context=>{
+test(`${platform} failed cold starts retry, redact infrastructure errors and reject SQLite fallback`,async context=>{
   const log=context.mock.method(console,'error',()=>{}),db=await fixtureDatabase(),now=new Date().toISOString();
   await db.prepare('INSERT INTO users(id,username,password_hash,role,created_at,updated_at) VALUES(?,?,?,?,?,?)').run(randomUUID(),'NetlifyRetry',hashPassword(randomUUID()),'admin',now,now);
   const privateValue='test-infrastructure-password';let attempts=0;
-  const handler=createNetlifyHandler({env:{...env,PHOTO_CAPTURE_ENABLED:'false'},connect:async()=>{if(++attempts===1)throw Error(privateValue);return db;}});
+  const handler=createHandler({env:{...deploymentEnv,PHOTO_CAPTURE_ENABLED:'false'},connect:async()=>{if(++attempts===1)throw Error(privateValue);return db;}});
   const request=()=>new Request(env.URL+'/api/health');
   try {
     const failed=await handler(request());assert.equal(failed.status,503);assert.ok(!(await failed.text()).includes(privateValue));
     assert.equal((await handler(request())).status,200);assert.equal(attempts,2);
-    const invalid=createNetlifyHandler({env:{...env,VOX_DATABASE:'sqlite'},connect:()=>{throw Error('must not connect');}});
+    const invalid=createHandler({env:{...deploymentEnv,VOX_DATABASE:'sqlite'},connect:()=>{throw Error('must not connect');}});
     assert.equal((await invalid(request())).status,503);
     assert.ok(!JSON.stringify(log.mock.calls).includes(privateValue));
   }finally{await handler.close();}
 });
+}

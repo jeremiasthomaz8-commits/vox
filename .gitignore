@@ -4,6 +4,7 @@ data/
 !.env.example
 node_modules/
 .netlify/
+.vercel/
 supabase/.temp/
 tmp/
 output/
