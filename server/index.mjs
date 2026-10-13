@@ -214,7 +214,7 @@ export async function createApp({db=null,production=false,publicOrigin='',trustP
         fail(404,'Recurso não encontrado.');
       }
       if(method!=='GET'&&method!=='HEAD')fail(405,'Método não permitido.');
-      const assets={'/':'index.html','/app.js':'app.js','/styles.css':'styles.css','/favicon.svg':'favicon.svg','/fonts/Sora-Variable.woff2':'fonts/Sora-Variable.woff2','/fonts/OFL-Sora.txt':'fonts/OFL-Sora.txt'};
+      const assets={'/':'index.html','/app.js':'app.js','/styles.css':'styles.css','/favicon.svg':'favicon.svg','/vox-logo.svg':'vox-logo.svg','/fonts/Sora-Variable.woff2':'fonts/Sora-Variable.woff2','/fonts/OFL-Sora.txt':'fonts/OFL-Sora.txt'};
       const filename=assets[path];if(!filename)fail(404,'Página não encontrada.');
       const type=filename.endsWith('.woff2')?'font/woff2':filename.endsWith('.txt')?'text/plain; charset=utf-8':filename.endsWith('.js')?'text/javascript; charset=utf-8':filename.endsWith('.css')?'text/css; charset=utf-8':filename.endsWith('.svg')?'image/svg+xml':'text/html; charset=utf-8';
       return send(200,readFileSync(resolve(ROOT,'public',filename)),type);
