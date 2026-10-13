@@ -16,7 +16,7 @@
     X-Content-Type-Options = "nosniff"
     X-Frame-Options = "DENY"
     Referrer-Policy = "same-origin"
-    Permissions-Policy = "camera=(self), microphone=(), geolocation=()"
+    Permissions-Policy = "camera=(self), fullscreen=(self), microphone=(), geolocation=()"
     Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
     Strict-Transport-Security = "max-age=31536000"
     Cache-Control = "no-store"

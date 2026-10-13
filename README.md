@@ -12,6 +12,8 @@ O Vox está publicado em **https://vox-louveira.netlify.app/**, usando **Netlify
 
 O código também suporta Vercel Functions com Node.js 24. Veja a [configuração para Vercel](docs/vercel.md). A publicação oficial permanece na Netlify Free: o Hobby gratuito da Vercel é restrito a uso pessoal e não comercial.
 
+O botão **Tela cheia** está disponível no login, no painel e nas unidades. Em navegadores móveis sem suporte, ele orienta como abrir o Vox pela tela inicial. Veja o [guia de tela cheia e modo aplicativo](docs/fullscreen.md).
+
 ## Executar localmente
 
 Requisito: **Node.js 24.21 ou superior da série 24.x**. Execute `npm ci` para instalar as dependências. O modo local SQLite funciona sem serviços externos; o modo Supabase usa a conexão privada do servidor.
