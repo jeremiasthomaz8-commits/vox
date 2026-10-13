@@ -23,6 +23,9 @@
   ],
   "crons": [{ "path": "/api/photo-retention", "schedule": "0 3 * * *" }],
   "headers": [{
+    "source": "/manifest.webmanifest",
+    "headers": [{ "key": "Content-Type", "value": "application/manifest+json; charset=utf-8" }]
+  },{
     "source": "/(.*)",
     "headers": [
       { "key": "X-Content-Type-Options", "value": "nosniff" },
